@@ -29,13 +29,13 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 2. [Schedule & Enforcement Timeline](#schedule--enforcement-timeline)
 3. [The Critical Requirement: Single Enforcement Per Session Date](#the-critical-requirement-single-enforcement-per-session-date)
 4. [Architecture & Code Structure](#architecture--code-structure)
-5. [Installation & Requirements](#installation--requirements)
+5. [Installation & Setup (1-Click Install & Uninstall)](#installation--setup)
 6. [Running the Application](#running-the-application)
 7. [Safe Testing Modes](#safe-testing-modes)
 8. [Windows Auto-Startup Setup](#windows-auto-startup-setup)
 9. [Optional Android Push Notifications (ntfy.sh)](#optional-android-push-notifications-ntfysh)
 10. [Safety & Emergency Recovery Procedure](#safety--emergency-recovery-procedure)
-11. [Packaging as Windows Standalone Executable](#packaging-as-windows-standalone-executable)
+11. [Packaging as Windows Standalone Executable Suite](#packaging-as-windows-standalone-executable-suite)
 12. [Automated Verification & Test Suite](#automated-verification--test-suite)
 13. [Documented Limitations & Technical Trade-offs](#documented-limitations--technical-trade-offs)
 
@@ -43,6 +43,8 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 
 ## Key Features & Design Philosophy
 
+- **1-Click Native Windows Installer (`install.exe`)**: Integrates cleanly into Windows (`%LOCALAPPDATA%\Programs\OFFLINE 11`), places a shortcut on your Desktop, and makes it searchable directly from the Windows Start Menu.
+- **1-Click Complete Uninstaller (`uninstall.exe`)**: Nukes every trace of the app (program files, shortcuts, startup registry entries, and user data/logs). Also integrated directly into Windows Settings > Installed Apps.
 - **Customizable Schedule**: While 11:00 PM is the default curfew, every milestone time (warnings, curfew, reminders, and shutdown) can be freely customized in **Settings** to match your personal sleep schedule.
 - **Self-Discipline Engine**: Built for self-restraint, not gamification. No badges, no leveling up, no analytics, no remote telemetry.
 - **Dark Monochrome Aesthetic**: Restrained, high-contrast system utility aesthetic (`#121212` charcoal black palette) with zero distracting animations.
@@ -147,8 +149,10 @@ d:\11ofDeath\
 ├── assets/
 │   ├── icon.ico              # Windows application icon
 │   └── icon.png              # High-resolution application logo
-├── build_exe.bat             # Compiles standalone Windows executable with PyInstaller
-├── build_exe.ps1             # PowerShell script to compile standalone executable
+├── install.py                # Standalone Windows application installer script
+├── uninstall.py              # Standalone 1-click uninstaller script
+├── build_exe.bat             # Compiles standalone Windows executable suite with PyInstaller
+├── build_exe.ps1             # PowerShell script to compile standalone executable suite
 ├── install_autostart.bat     # Helper script to enable auto-startup on Windows boot
 ├── run_test_mode.bat         # Safe 60-second accelerated simulation launcher
 └── requirements.txt          # Python dependencies
