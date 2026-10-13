@@ -43,6 +43,7 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 
 ## Key Features & Design Philosophy
 
+- **Customizable Schedule**: While 11:00 PM is the default curfew, every milestone time (warnings, curfew, reminders, and shutdown) can be freely customized in **Settings** to match your personal sleep schedule.
 - **Self-Discipline Engine**: Built for self-restraint, not gamification. No badges, no leveling up, no analytics, no remote telemetry.
 - **Dark Monochrome Aesthetic**: Restrained, high-contrast system utility aesthetic (`#121212` charcoal black palette) with zero distracting animations.
 - **Topmost Curfew Enforcement**: At 11:00 PM, a prominent, always-visible modal appears requiring explicit confirmation. Ignoring the prompt never cancels curfew.
@@ -56,6 +57,13 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 ---
 
 ## Schedule & Enforcement Timeline
+
+> [!TIP]
+> **Need a different curfew time?**  
+> While the default schedule is set for an **11:00 PM curfew / 11:15 PM shutdown**, all times are completely customizable to fit your routine:
+> 1. Click **SETTINGS** in the OFFLINE 11 dashboard.
+> 2. Edit any milestone in standard 24-hour `HH:MM` format (e.g., set Curfew to `22:00` for 10:00 PM, `00:00` for midnight, or any custom target).
+> 3. Click **SAVE SETTINGS**. The app automatically validates that your warnings and shutdown are properly sequenced.
 
 The default 24-hour schedule operates as follows:
 
