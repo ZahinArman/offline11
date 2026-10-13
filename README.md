@@ -156,20 +156,50 @@ d:\11ofDeath\
 
 ---
 
-## Installation & Requirements
+## Installation & Setup
 
-### System Requirements
-- **OS**: Windows 10 or Windows 11 (64-bit recommended)
-- **Python**: Python 3.10 or later
+### Option 1: Quick 1-Click Install (Pre-compiled Windows Application)
 
-### Setup Instructions
-1. Clone or copy the project repository to your desired folder:
+No Python or terminal knowledge required:
+
+1. Download **`OFFLINE11-v1.0.0.zip`** from the [GitHub Releases](https://github.com/ZahinArman/offline11/releases) page.
+2. Extract the `.zip` archive.
+3. Double-click **`install.exe`**.
+4. You are done!
+   - **Searchable**: Press the Windows Key and type `OFFLINE 11` to launch it immediately.
+   - **Desktop Shortcut**: An icon is automatically placed on your Desktop.
+   - **Clean Installation**: Files are stored in `%LOCALAPPDATA%\Programs\OFFLINE 11` (the standard per-user application directory used by apps like VS Code and Chrome).
+
+#### 🧹 Complete 1-Click Uninstaller (`uninstall.exe`)
+Need to remove the utility completely? We provide a built-in uninstaller that nukes every related file:
+- Run **`uninstall.exe`** from your downloaded folder.
+- **OR** Search **"Uninstall OFFLINE 11"** directly from your Windows Start Menu.
+- **OR** Go to **Windows Settings > Apps > Installed apps**, find **OFFLINE 11**, and click **Uninstall**.
+
+The uninstaller will prompt for confirmation and then permanently wipe:
+- All program binaries and libraries
+- Desktop and Start Menu shortcuts
+- Windows startup registry entries
+- All local settings, state records, and audit logs (`%LOCALAPPDATA%\OFFLINE11`)
+
+---
+
+### Option 2: Running from Source (Python 3.10+)
+
+1. Clone the repository:
    ```cmd
-   cd d:\11ofDeath
+   git clone https://github.com/ZahinArman/offline11.git
+   cd offline11
    ```
-2. Install Python dependencies:
+2. Install dependencies:
    ```cmd
    pip install -r requirements.txt
+   ```
+3. Run the installer script or run directly:
+   ```cmd
+   python install.py
+   # Or run directly:
+   python offline11\main.py
    ```
 
 ---
@@ -303,9 +333,9 @@ If you click `GENUINE EMERGENCY` on the curfew modal:
 
 ---
 
-## Packaging as Windows Standalone Executable
+## Packaging as Windows Standalone Executable Suite
 
-To compile OFFLINE 11 into a standalone `.exe` that does not require Python to run:
+To compile OFFLINE 11 into standalone `.exe` binaries that do not require Python to run:
 
 ### Batch Script:
 Double-click:
@@ -318,10 +348,10 @@ build_exe.bat
 .\build_exe.ps1
 ```
 
-The resulting executable and bundled runtime files will be generated in:
-```
-dist\OFFLINE11\OFFLINE11.exe
-```
+The script automatically builds all 3 components into `dist/`:
+- **`dist\OFFLINE11\OFFLINE11.exe`**: Main standalone application and runtime libraries.
+- **`dist\install.exe`**: Standalone 1-click Windows installer.
+- **`dist\uninstall.exe`**: Standalone 1-click uninstaller.
 
 ---
 
