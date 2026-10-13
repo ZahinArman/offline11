@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.spec
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs and runtime data
+*.log
+*.pid
+state.json
+config.json
+*.tmp
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test & coverage
+.coverage
+htmlcov/
+.pytest_cache/
