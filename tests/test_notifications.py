@@ -52,6 +52,16 @@ class TestNotificationManager(unittest.TestCase):
             time.sleep(0.1)
             self.assertTrue(mock_beep.called)
 
+    def test_notify_unified_dispatch(self) -> None:
+        """Verifies notify() invokes send_toast, play_sound, and send_push_notification."""
+        with patch.object(self.mgr, "send_toast") as mock_toast, \
+             patch.object(self.mgr, "play_sound") as mock_sound, \
+             patch.object(self.mgr, "send_push_notification") as mock_push:
+            self.mgr.notify("Title", "Message", sound_type="urgent")
+            mock_toast.assert_called_once_with("Title", "Message", long_duration=False)
+            mock_sound.assert_called_once_with(sound_type="urgent")
+            mock_push.assert_called_once_with("Title", "Message", priority="default", tags="clock")
+
 
 if __name__ == "__main__":
     unittest.main()

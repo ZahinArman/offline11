@@ -17,11 +17,13 @@ from offline11.logger import AuditLogger
 from offline11.scheduler import Scheduler
 from offline11.state import CurfewStatus, StateManager
 from offline11.time_provider import TimeProvider
+from offline11.notifications import NotificationManager
 from offline11.ui.audit_dialog import AuditDialog
 from offline11.ui.curfew_dialog import CurfewDialog
 from offline11.ui.countdown_widget import CountdownWidget
 from offline11.ui.emergency_dialog import EmergencyDialog
 from offline11.ui.settings_dialog import SettingsDialog
+from offline11.ui.warning_dialog import WarningDialog
 from offline11.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
@@ -56,6 +58,7 @@ class MainWindow(tk.Tk):
         scheduler: Scheduler,
         audit_logger: AuditLogger,
         time_provider: TimeProvider,
+        notifications: Optional[NotificationManager] = None,
         on_hide_to_tray: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__()
@@ -64,16 +67,18 @@ class MainWindow(tk.Tk):
         self.scheduler = scheduler
         self.audit_logger = audit_logger
         self.time_provider = time_provider
+        self.notifications = notifications
         self.on_hide_to_tray = on_hide_to_tray
 
         self.title("OFFLINE 11 — Strict PC Curfew")
         self.configure(bg=BG_DARK)
-        self.geometry("520x540")
-        self.minsize(480, 500)
+        self.geometry("520x560")
+        self.minsize(480, 520)
 
         # Dialog instances
         self.curfew_dialog: Optional[CurfewDialog] = None
         self.countdown_widget: Optional[CountdownWidget] = None
+        self.warning_dialog: Optional[WarningDialog] = None
 
         # Intercept window close to minimize to tray instead of quitting
         self.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
@@ -86,8 +91,8 @@ class MainWindow(tk.Tk):
         self.scheduler.on_warning_1 = self._on_warning_1_event
         self.scheduler.on_warning_2 = self._on_warning_2_event
         self.scheduler.on_curfew_start = self._on_curfew_event
-        self.scheduler.on_grace_reminder_1 = self._on_grace_reminder
-        self.scheduler.on_grace_reminder_2 = self._on_grace_reminder
+        self.scheduler.on_grace_reminder_1 = self._on_grace_reminder_1
+        self.scheduler.on_grace_reminder_2 = self._on_grace_reminder_2
         self.scheduler.on_final_warning = self._on_final_warning
         self.scheduler.on_shutdown_executed = self._on_shutdown_executed
         self.scheduler.on_state_change = self._on_state_changed
@@ -259,14 +264,18 @@ class MainWindow(tk.Tk):
         self.rearm_btn.pack(fill=tk.X)
         self.rearm_frame.pack_forget()
 
-        # Action Buttons Grid
+        # Action Buttons Grid (2 rows for clean layout)
         btn_grid = tk.Frame(container, bg=BG_DARK)
         btn_grid.pack(fill=tk.X, pady=(0, 16))
 
+        # Row 1: Primary Controls
+        row1 = tk.Frame(btn_grid, bg=BG_DARK)
+        row1.pack(fill=tk.X, pady=(0, 6))
+
         settings_btn = tk.Button(
-            btn_grid,
+            row1,
             text="SETTINGS",
-            font=FONT_BODY,
+            font=FONT_BODY_BOLD,
             bg=BG_BUTTON,
             fg=TEXT_PRIMARY,
             activebackground=BG_BUTTON_HOVER,
@@ -276,12 +285,12 @@ class MainWindow(tk.Tk):
             pady=8,
             command=self._open_settings,
         )
-        settings_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 6))
+        settings_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 4))
 
         audit_btn = tk.Button(
-            btn_grid,
+            row1,
             text="AUDIT LOG",
-            font=FONT_BODY,
+            font=FONT_BODY_BOLD,
             bg=BG_BUTTON,
             fg=TEXT_PRIMARY,
             activebackground=BG_BUTTON_HOVER,
@@ -291,22 +300,41 @@ class MainWindow(tk.Tk):
             pady=8,
             command=self._open_audit,
         )
-        audit_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(6, 6))
+        audit_btn.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(4, 0))
 
-        test_btn = tk.Button(
-            btn_grid,
-            text="TEST CURFEW",
+        # Row 2: Safe Test Buttons
+        row2 = tk.Frame(btn_grid, bg=BG_DARK)
+        row2.pack(fill=tk.X)
+
+        test_warn_btn = tk.Button(
+            row2,
+            text="TEST WARNING (POPUP & SOUND)",
             font=FONT_BODY,
             bg=BG_BUTTON,
             fg=TEXT_PRIMARY,
             activebackground=BG_BUTTON_HOVER,
             activeforeground=TEXT_PRIMARY,
             relief=tk.FLAT,
-            padx=14,
+            padx=8,
+            pady=8,
+            command=self._trigger_test_warning,
+        )
+        test_warn_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 4))
+
+        test_curfew_btn = tk.Button(
+            row2,
+            text="TEST CURFEW (CURFEW MODAL)",
+            font=FONT_BODY,
+            bg=BG_BUTTON,
+            fg=TEXT_PRIMARY,
+            activebackground=BG_BUTTON_HOVER,
+            activeforeground=TEXT_PRIMARY,
+            relief=tk.FLAT,
+            padx=8,
             pady=8,
             command=self._trigger_test_curfew,
         )
-        test_btn.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(6, 0))
+        test_curfew_btn.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(4, 0))
 
         # Bottom Bar: Hide to tray
         bottom_row = tk.Frame(container, bg=BG_DARK)
@@ -327,7 +355,12 @@ class MainWindow(tk.Tk):
         tray_btn.pack(fill=tk.X)
 
     def _open_settings(self) -> None:
-        SettingsDialog(self, self.config_mgr, on_save_callback=self._on_settings_saved)
+        SettingsDialog(
+            self,
+            self.config_mgr,
+            on_save_callback=self._on_settings_saved,
+            on_test_warning=self._trigger_test_warning,
+        )
 
     def _on_settings_saved(self, new_config: Config) -> None:
         self.lbl_w1.config(text=new_config.warning_1_time)
@@ -338,9 +371,27 @@ class MainWindow(tk.Tk):
             fg=TEXT_ACCENT if new_config.dry_run else TEXT_DANGER,
         )
         self.scheduler.shutdown_mgr.dry_run = new_config.dry_run
+        if self.notifications:
+            self.notifications.update_config(new_config)
 
     def _open_audit(self) -> None:
         AuditDialog(self, self.audit_logger)
+
+    def _trigger_test_warning(self) -> None:
+        """Triggers a sample warning popup, sound alert, and notification for testing."""
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: 30-Minute Warning (Test)",
+                message="Sample 30-minute curfew warning. Finish what you are doing and start winding down.",
+                sound_type="warning",
+            )
+        self._show_warning_dialog(
+            tag_text="Test Warning",
+            title="30 MINUTES REMAINING (TEST)",
+            message="This is a test curfew warning.\nAt scheduled warning times, this popup window will appear on top of all applications, accompanied by audio chimes and system notifications.",
+            level="warning",
+            auto_close_seconds=20,
+        )
 
     def _trigger_test_curfew(self) -> None:
         """Triggers the curfew dialog immediately for safe testing."""
@@ -423,26 +474,161 @@ class MainWindow(tk.Tk):
             self._update_display()
             messagebox.showinfo("Curfew Re-Armed", "Curfew has been re-armed for tonight.", parent=self)
 
+    def _show_warning_dialog(
+        self,
+        tag_text: str,
+        title: str,
+        message: str,
+        level: str = "warning",
+        auto_close_seconds: int = 30,
+    ) -> None:
+        if self.warning_dialog and self.warning_dialog.winfo_exists():
+            try:
+                self.warning_dialog.destroy()
+            except Exception:
+                pass
+        self.warning_dialog = WarningDialog(
+            parent=self,
+            tag_text=tag_text,
+            title=title,
+            message=message,
+            level=level,
+            auto_close_seconds=auto_close_seconds,
+            on_open_dashboard=self.show_from_tray,
+        )
+
     # Scheduler Event Callbacks
     def _on_warning_1_event(self) -> None:
-        pass
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: 30-Minute Warning",
+                message="30 minutes until PC curfew. Finish what you're doing and start winding down.",
+                sound_type="warning",
+                push_priority="default",
+                push_tags="clock",
+            )
+        curfew_t = self.config_mgr.config.curfew_time
+        self._show_warning_dialog(
+            tag_text="30-Minute Warning",
+            title="30 MINUTES REMAINING",
+            message=f"Curfew begins in 30 minutes (at {curfew_t}).\nFinish your current task and start winding down.",
+            level="warning",
+            auto_close_seconds=30,
+        )
 
     def _on_warning_2_event(self) -> None:
-        pass
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: 10-Minute Warning",
+                message="10 minutes until PC curfew. Save your work and close everything.",
+                sound_type="urgent",
+                push_priority="high",
+                push_tags="warning",
+            )
+        curfew_t = self.config_mgr.config.curfew_time
+        self._show_warning_dialog(
+            tag_text="Final Curfew Warning",
+            title="10 MINUTES REMAINING",
+            message=f"Curfew begins in 10 minutes (at {curfew_t})!\nSave all open work and close applications now.",
+            level="urgent",
+            auto_close_seconds=30,
+        )
 
     def _on_curfew_event(self) -> None:
+        if self.warning_dialog and self.warning_dialog.winfo_exists():
+            try:
+                self.warning_dialog.destroy()
+                self.warning_dialog = None
+            except Exception:
+                pass
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: PC Curfew Active",
+                message="PC TIME IS OVER. Is there a genuine emergency?",
+                sound_type="urgent",
+                long_duration=True,
+                push_priority="urgent",
+                push_tags="stop_sign",
+            )
         self._show_curfew_dialog()
 
-    def _on_grace_reminder(self) -> None:
-        pass
+    def _on_grace_reminder_1(self) -> None:
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: 10 Minutes Until Shutdown",
+                message="10 minutes until PC shutdown. Save all open files.",
+                sound_type="warning",
+                push_priority="high",
+                push_tags="warning",
+            )
+        self._show_warning_dialog(
+            tag_text="Grace Period Reminder",
+            title="10 MINUTES UNTIL SHUTDOWN",
+            message="10 minutes remaining until system power-off.\nPlease save all open files and documents immediately.",
+            level="urgent",
+            auto_close_seconds=20,
+        )
+
+    def _on_grace_reminder_2(self) -> None:
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: 5 Minutes Until Shutdown",
+                message="5 minutes until PC shutdown. Close all open applications.",
+                sound_type="urgent",
+                push_priority="urgent",
+                push_tags="hourglass",
+            )
+        self._show_warning_dialog(
+            tag_text="Urgent Shutdown Reminder",
+            title="5 MINUTES UNTIL SHUTDOWN",
+            message="5 minutes remaining! Close all open applications now to prevent data loss.",
+            level="urgent",
+            auto_close_seconds=20,
+        )
 
     def _on_final_warning(self) -> None:
-        pass
+        if self.notifications:
+            self.notifications.notify(
+                title="OFFLINE 11: Final 1-Minute Warning",
+                message="PC shutdown will initiate in 1 minute. Prepare for power off.",
+                sound_type="urgent",
+                push_priority="max",
+                push_tags="skull",
+            )
+        self._show_warning_dialog(
+            tag_text="CRITICAL WARNING",
+            title="1 MINUTE UNTIL SHUTDOWN",
+            message="System shutdown will begin in 60 seconds!\nAll open applications will be closed.",
+            level="critical",
+            auto_close_seconds=30,
+        )
 
     def _on_shutdown_executed(self, success: bool, msg: str) -> None:
         if self.countdown_widget and self.countdown_widget.winfo_exists():
             self.countdown_widget.destroy()
             self.countdown_widget = None
+        if self.warning_dialog and self.warning_dialog.winfo_exists():
+            self.warning_dialog.destroy()
+            self.warning_dialog = None
+
+        if self.notifications:
+            if success:
+                self.notifications.notify(
+                    title="OFFLINE 11: System Shutdown Initiated",
+                    message="Curfew shutdown command accepted by Windows.",
+                    sound_type="urgent",
+                    push_priority="max",
+                    push_tags="skull",
+                )
+            else:
+                self.notifications.notify(
+                    title="OFFLINE 11: SHUTDOWN FAILED",
+                    message=f"Windows shutdown was blocked or failed: {msg}",
+                    sound_type="urgent",
+                    push_priority="max",
+                    push_tags="warning",
+                )
+
         if not success:
             messagebox.showerror(
                 "SHUTDOWN EXECUTION FAILED",

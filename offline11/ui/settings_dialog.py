@@ -38,11 +38,13 @@ class SettingsDialog(tk.Toplevel):
         parent: tk.Tk,
         config_mgr: ConfigManager,
         on_save_callback: Callable[[Config], None],
+        on_test_warning: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__(parent)
         self.config_mgr = config_mgr
         self.config = config_mgr.config
         self.on_save_callback = on_save_callback
+        self.on_test_warning = on_test_warning
 
         self.title("SETTINGS — OFFLINE 11")
         self.configure(bg=BG_DARK)
@@ -250,6 +252,22 @@ class SettingsDialog(tk.Toplevel):
             command=self.destroy,
         )
         cancel_btn.pack(side=tk.LEFT)
+
+        if self.on_test_warning:
+            test_btn = tk.Button(
+                btn_row,
+                text="TEST NOTIFICATION & POPUP",
+                font=FONT_BODY,
+                bg=BG_BUTTON,
+                fg=TEXT_PRIMARY,
+                activebackground=BG_BUTTON_HOVER,
+                activeforeground=TEXT_PRIMARY,
+                relief=tk.FLAT,
+                padx=12,
+                pady=8,
+                command=self.on_test_warning,
+            )
+            test_btn.pack(side=tk.RIGHT)
 
     def _load_values(self) -> None:
         for field, entry in self.entries.items():

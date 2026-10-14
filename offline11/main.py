@@ -175,95 +175,14 @@ def main() -> None:
             shutdown_mgr=shutdown_mgr,
         )
 
-        # 6. Wire Notifications to Scheduler Milestones
-        def _on_w1() -> None:
-            notifications.notify(
-                title="OFFLINE 11: 30-Minute Warning",
-                message="30 minutes until PC curfew. Finish what you're doing and start winding down.",
-                sound_type="warning",
-                push_priority="default",
-                push_tags="clock",
-            )
-
-        def _on_w2() -> None:
-            notifications.notify(
-                title="OFFLINE 11: 10-Minute Warning",
-                message="10 minutes until PC curfew. Save your work and close everything.",
-                sound_type="warning",
-                push_priority="high",
-                push_tags="warning",
-            )
-
-        def _on_curfew() -> None:
-            notifications.notify(
-                title="OFFLINE 11: PC Curfew Active",
-                message="PC TIME IS OVER. Is there a genuine emergency?",
-                sound_type="urgent",
-                long_duration=True,
-                push_priority="urgent",
-                push_tags="stop_sign",
-            )
-
-        def _on_reminder_1() -> None:
-            notifications.notify(
-                title="OFFLINE 11: 10 Minutes Until Shutdown",
-                message="10 minutes until PC shutdown. Save all open files.",
-                sound_type="warning",
-                push_priority="high",
-                push_tags="warning",
-            )
-
-        def _on_reminder_2() -> None:
-            notifications.notify(
-                title="OFFLINE 11: 5 Minutes Until Shutdown",
-                message="5 minutes until PC shutdown. Close all open applications.",
-                sound_type="warning",
-                push_priority="urgent",
-                push_tags="hourglass",
-            )
-
-        def _on_final() -> None:
-            notifications.notify(
-                title="OFFLINE 11: Final 1-Minute Warning",
-                message="PC shutdown will initiate in 1 minute. Prepare for power off.",
-                sound_type="urgent",
-                push_priority="urgent",
-                push_tags="skull",
-            )
-
-        def _on_shutdown(success: bool, msg: str) -> None:
-            if success:
-                notifications.notify(
-                    title="OFFLINE 11: System Shutdown Initiated",
-                    message="Curfew shutdown command accepted by Windows.",
-                    sound_type="urgent",
-                    push_priority="max",
-                    push_tags="skull",
-                )
-            else:
-                notifications.notify(
-                    title="OFFLINE 11: SHUTDOWN FAILED",
-                    message=f"Windows shutdown was blocked or failed: {msg}",
-                    sound_type="urgent",
-                    push_priority="max",
-                    push_tags="warning",
-                )
-
-        scheduler.on_warning_1 = _on_w1
-        scheduler.on_warning_2 = _on_w2
-        scheduler.on_curfew_start = _on_curfew
-        scheduler.on_grace_reminder_1 = _on_reminder_1
-        scheduler.on_grace_reminder_2 = _on_reminder_2
-        scheduler.on_final_warning = _on_final
-        scheduler.on_shutdown_executed = _on_shutdown
-
-        # 7. Build GUI Dashboard
+        # 6. Build GUI Dashboard (wires scheduler milestones, popups, and notification alerts)
         main_window = MainWindow(
             config_mgr=config_mgr,
             state_mgr=state_mgr,
             scheduler=scheduler,
             audit_logger=audit_logger,
             time_provider=time_provider,
+            notifications=notifications,
         )
 
         # 8. Setup System Tray
