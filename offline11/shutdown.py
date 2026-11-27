@@ -9,6 +9,10 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import sys
+
+# Prevents a console window flashing up when called from the windowless app.
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 from typing import Optional, Tuple
 
 
@@ -43,7 +47,7 @@ class ShutdownManager:
 
         try:
             logging.info(f"Executing shutdown command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, creationflags=NO_WINDOW)
             if result.returncode == 0:
                 return True, "Shutdown command accepted by Windows."
             else:
@@ -72,7 +76,7 @@ class ShutdownManager:
 
         try:
             logging.info("Executing shutdown abort command: shutdown.exe /a")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, creationflags=NO_WINDOW)
             # Exit code 0 means successfully aborted.
             # Exit code 1116 (ERROR_SHUTDOWN_NOT_IN_PROGRESS) also means no shutdown is running.
             if result.returncode == 0 or "1116" in result.stderr:

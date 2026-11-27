@@ -1,7 +1,7 @@
 """
 Time provider module for OFFLINE 11.
 Provides clock abstraction supporting both real local system time
-and deterministic virtual time for accelerated testing.
+and virtual time for tests and accelerated simulation.
 """
 
 from __future__ import annotations
@@ -39,30 +39,36 @@ class RealTimeProvider(TimeProvider):
 class VirtualTimeProvider(TimeProvider):
     """
     Virtual clock for testing and simulation.
-    Can be stepped manually or run with an acceleration factor.
+
+    - Stepped mode (running=False, used by unit tests): time only moves via set_time()/advance().
+    - Running mode (running=True): time flows at acceleration_factor x real time.
     """
 
-    def __init__(self, initial_dt: Optional[datetime] = None, acceleration_factor: float = 1.0) -> None:
-        if initial_dt is None:
-            self._current_dt = datetime.now().astimezone()
-        else:
-            self._current_dt = initial_dt
+    def __init__(
+        self,
+        initial_dt: Optional[datetime] = None,
+        acceleration_factor: float = 1.0,
+        running: bool = False,
+    ) -> None:
+        self._base_dt = initial_dt if initial_dt is not None else datetime.now().astimezone()
+        self._base_mono = time.monotonic()
         self.acceleration_factor = max(0.001, acceleration_factor)
+        self.running = running
 
     def now(self) -> datetime:
-        return self._current_dt
+        if not self.running:
+            return self._base_dt
+        elapsed = (time.monotonic() - self._base_mono) * self.acceleration_factor
+        return self._base_dt + timedelta(seconds=elapsed)
 
     def set_time(self, new_dt: datetime) -> None:
-        self._current_dt = new_dt
+        self._base_dt = new_dt
+        self._base_mono = time.monotonic()
 
     def advance(self, seconds: float) -> None:
-        self._current_dt += timedelta(seconds=seconds)
+        self.set_time(self.now() + timedelta(seconds=seconds))
 
     def sleep(self, seconds: float) -> None:
-        """Simulates sleep by advancing virtual time and waiting a scaled wall-clock interval."""
+        """Simulates sleep by advancing virtual time and waiting a short scaled wall-clock interval."""
         self.advance(seconds)
-        scaled_wait = seconds / self.acceleration_factor
-        # Limit real wait to avoid stalling automated tests
-        if scaled_wait > 0.05:
-            scaled_wait = 0.05
-        time.sleep(scaled_wait)
+        time.sleep(min(0.05, seconds / self.acceleration_factor))

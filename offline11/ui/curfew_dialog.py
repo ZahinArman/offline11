@@ -7,7 +7,7 @@ Prominent, always-visible dialog displayed at 11:00 PM asking:
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Callable
+from typing import Callable, Optional
 
 from offline11.ui.theme import (
     BG_BUTTON,
@@ -37,12 +37,16 @@ class CurfewDialog(tk.Toplevel):
         parent: tk.Tk,
         on_no_emergency: Callable[[], None],
         on_genuine_emergency: Callable[[], None],
+        info_text: Optional[str] = None,
+        is_preview: bool = False,
     ) -> None:
         super().__init__(parent)
         self.on_no_emergency = on_no_emergency
         self.on_genuine_emergency = on_genuine_emergency
+        self.info_text = info_text
+        self.is_preview = is_preview
 
-        self.title("OFFLINE 11 — PC TIME IS OVER")
+        self.title("OFFLINE 11 — PREVIEW" if is_preview else "OFFLINE 11 — PC TIME IS OVER")
         self.configure(bg=BG_DARK)
         self.geometry("560x360")
         self.resizable(False, False)
@@ -71,7 +75,7 @@ class CurfewDialog(tk.Toplevel):
         # Header tag
         tag = tk.Label(
             container,
-            text="[ CURFEW ENFORCEMENT ]",
+            text="[ PREVIEW — NOTHING WILL HAPPEN ]" if self.is_preview else "[ CURFEW ENFORCEMENT ]",
             font=FONT_BODY_BOLD,
             fg=TEXT_SECONDARY,
             bg=BG_DARK,
@@ -111,9 +115,9 @@ class CurfewDialog(tk.Toplevel):
         )
         info_card.pack(fill=tk.X, pady=(0, 24))
 
-        info_text = (
-            "Selecting NO EMERGENCY grants a 15-minute shutdown grace period (until 11:15 PM) "
-            "to save your work and close applications.\n\n"
+        info_text = self.info_text or (
+            "Selecting NO EMERGENCY keeps the grace period running so you can save your work "
+            "and close applications.\n\n"
             "Ignoring this dialog will NOT cancel or delay the scheduled shutdown."
         )
         info_lbl = tk.Label(

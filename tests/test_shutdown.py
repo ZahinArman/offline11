@@ -8,7 +8,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from offline11.shutdown import ShutdownManager
+from offline11.shutdown import NO_WINDOW, ShutdownManager
 
 
 class TestShutdownManager(unittest.TestCase):
@@ -42,6 +42,7 @@ class TestShutdownManager(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 check=False,
+                creationflags=NO_WINDOW,
             )
 
     def test_live_cancellation_command_arguments(self) -> None:
@@ -56,6 +57,7 @@ class TestShutdownManager(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 check=False,
+                creationflags=NO_WINDOW,
             )
 
     def test_failed_shutdown_reported_clearly(self) -> None:

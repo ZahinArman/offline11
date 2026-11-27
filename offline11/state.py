@@ -1,37 +1,52 @@
 """
 Curfew State Machine and Session Persistence.
-Strictly ensures curfew is enforced at most once per calendar day session.
-A completed shutdown or granted emergency exception permanently resolves the session.
+
+A "session" is one night's curfew cycle, keyed by the date on which its First Warning fires.
+Each session is enforced at most once. Once resolved (shutdown done, emergency, cancelled,
+skipped, or missed) nothing else happens until the next night's First Warning.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
-from datetime import date, datetime, time, timedelta
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, time, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from offline11.config import Config, get_default_data_dir
+from offline11.config import get_default_data_dir
 
 
 class CurfewStatus(str, Enum):
-    NORMAL = "NORMAL"                            # Regular PC usage, awaiting scheduled curfew
-    WARNING_1 = "WARNING_1"                      # 10:30 PM warning triggered
-    WARNING_2 = "WARNING_2"                      # 10:50 PM final warning triggered
-    CURFEW_ACTIVE = "CURFEW_ACTIVE"              # 11:00 PM curfew dialog active
-    SHUTDOWN_PENDING = "SHUTDOWN_PENDING"        # 11:00-11:15 PM countdown active
+    NORMAL = "NORMAL"                            # Regular PC usage, awaiting tonight's schedule
+    WARNING_1 = "WARNING_1"                      # First warning shown
+    WARNING_2 = "WARNING_2"                      # Final warning before curfew shown
+    CURFEW_ACTIVE = "CURFEW_ACTIVE"              # (legacy, kept for old state files)
+    SHUTDOWN_PENDING = "SHUTDOWN_PENDING"        # Curfew began, grace countdown running
     SHUTDOWN_INITIATED = "SHUTDOWN_INITIATED"    # Windows shutdown command issued
-    SHUTDOWN_COMPLETED = "SHUTDOWN_COMPLETED"    # Shutdown completed / session permanently resolved
-    EMERGENCY_EXCEPTION = "EMERGENCY_EXCEPTION"  # Emergency granted / session permanently resolved
-    SHUTDOWN_CANCELLED = "SHUTDOWN_CANCELLED"    # User manually aborted shutdown
-    SHUTDOWN_FAILED = "SHUTDOWN_FAILED"          # Windows shutdown command failed
+    SHUTDOWN_COMPLETED = "SHUTDOWN_COMPLETED"    # Shutdown issued / tonight is done
+    EMERGENCY_EXCEPTION = "EMERGENCY_EXCEPTION"  # Emergency declared / tonight is done
+    SHUTDOWN_CANCELLED = "SHUTDOWN_CANCELLED"    # User aborted the countdown / tonight is done
+    SHUTDOWN_FAILED = "SHUTDOWN_FAILED"          # Windows refused the shutdown command
+    SKIPPED = "SKIPPED"                          # PC was turned on / woke after curfew began: never lock the user out
+    MISSED = "MISSED"                            # Tonight's window passed without a shutdown (PC was off/asleep)
+
+
+RESOLVED_STATUSES = {
+    CurfewStatus.SHUTDOWN_COMPLETED.value,
+    CurfewStatus.SHUTDOWN_INITIATED.value,
+    CurfewStatus.EMERGENCY_EXCEPTION.value,
+    CurfewStatus.SHUTDOWN_CANCELLED.value,
+    CurfewStatus.SHUTDOWN_FAILED.value,
+    CurfewStatus.SKIPPED.value,
+    CurfewStatus.MISSED.value,
+}
 
 
 @dataclass
 class SessionRecord:
-    session_date: str                        # YYYY-MM-DD of the day the curfew began (at 10:30/11:00 PM)
+    session_date: str                        # YYYY-MM-DD of the night's First Warning
     status: str = CurfewStatus.NORMAL.value
     curfew_accepted: bool = False
     emergency_reason: Optional[str] = None
@@ -39,14 +54,12 @@ class SessionRecord:
     shutdown_scheduled_for: Optional[str] = None
     shutdown_initiated_at: Optional[str] = None
     last_update: Optional[str] = None
+    fired_events: List[str] = field(default_factory=list)  # persisted so restarts never replay alerts
+    last_seen: Optional[str] = None          # heartbeat: proves the app (and PC) stayed on
 
     def is_resolved(self) -> bool:
-        """A session is permanently resolved once shutdown has completed or emergency exception was granted."""
-        return self.status in (
-            CurfewStatus.SHUTDOWN_COMPLETED.value,
-            CurfewStatus.SHUTDOWN_INITIATED.value,
-            CurfewStatus.EMERGENCY_EXCEPTION.value,
-        )
+        """A resolved session never triggers anything again."""
+        return self.status in RESOLVED_STATUSES
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -59,10 +72,7 @@ class SessionRecord:
 
 
 class StateManager:
-    """
-    Manages persistent curfew state and transitions.
-    Tracks sessions strictly by reference date so reboots after curfew never trigger duplicate shutdowns.
-    """
+    """Persists the current night's session record."""
 
     def __init__(self, state_file: Optional[Path] = None) -> None:
         if state_file is None:
@@ -72,12 +82,10 @@ class StateManager:
         self.record: Optional[SessionRecord] = self._load()
 
     def _load(self) -> Optional[SessionRecord]:
-        """Loads session record from disk."""
         if self.state_file.exists():
             try:
                 with open(self.state_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return SessionRecord.from_dict(data)
+                    return SessionRecord.from_dict(json.load(f))
             except Exception:
                 return None
         return None
@@ -95,141 +103,20 @@ class StateManager:
     @staticmethod
     def get_session_date_for_time(current_dt: datetime, warning_1_time: time) -> str:
         """
-        Determines the reference session date for a given datetime.
-        If current_dt is on or after warning_1_time (e.g. 22:30), the session date is today.
-        If current_dt is before warning_1_time (e.g. 00:00 to 22:29), the previous session date was yesterday.
+        The session a moment belongs to is the one whose First Warning fired most recently.
+        At or after warning_1_time -> today; before it -> yesterday.
         """
         if current_dt.time() >= warning_1_time:
             return current_dt.date().isoformat()
-        else:
-            yesterday = current_dt.date() - timedelta(days=1)
-            return yesterday.isoformat()
+        return (current_dt.date() - timedelta(days=1)).isoformat()
 
-    def sync_for_time(self, current_dt: datetime, config: Config) -> CurfewStatus:
-        """
-        Synchronizes state for the current time.
-        Respects completed shutdowns and emergency exceptions so no duplicate curfew occurs.
-        """
-        w1_time = config.get_time_obj("warning_1_time")
-        active_session_date = self.get_session_date_for_time(current_dt, w1_time)
+    # --- Session lifecycle -------------------------------------------------------------
 
-        # Check if we have an existing record for active_session_date
-        if self.record and self.record.session_date == active_session_date:
-            # If it's already resolved (completed shutdown or emergency exception)
-            if self.record.is_resolved():
-                # Stays resolved! PC usage is normal or resolved.
-                return CurfewStatus(self.record.status)
+    def has_session(self, session_date: str) -> bool:
+        return self.record is not None and self.record.session_date == session_date
 
-            # If it was SHUTDOWN_PENDING, check if the deadline has passed
-            if self.record.status == CurfewStatus.SHUTDOWN_PENDING.value:
-                if self.record.shutdown_scheduled_for:
-                    sched_dt = datetime.fromisoformat(self.record.shutdown_scheduled_for)
-                    # If current time is past scheduled shutdown time and it wasn't marked complete,
-                    # keep pending or execute shutdown
-                    return CurfewStatus.SHUTDOWN_PENDING
-
-            return CurfewStatus(self.record.status)
-
-        # If current time is before warning_1_time, today's session has not started yet.
-        # Check if yesterday's session was resolved.
-        if current_dt.time() < w1_time:
-            # We are in the daytime before tonight's curfew (e.g. 12:00 AM to 10:29 PM).
-            # The PC is in normal usage.
-            if self.record and self.record.session_date == active_session_date and self.record.is_resolved():
-                return CurfewStatus.NORMAL
-            return CurfewStatus.NORMAL
-
-        # If we reach here, current_dt.time() >= warning_1_time and no record exists for today.
-        # Initialize a new session for active_session_date
-        self.record = SessionRecord(
-            session_date=active_session_date,
-            status=CurfewStatus.NORMAL.value,
-            last_update=current_dt.isoformat(),
-        )
-        self._save()
-        return CurfewStatus.NORMAL
-
-    def set_status(self, status: CurfewStatus, current_dt: datetime) -> None:
-        """Updates and persists the current status."""
-        if self.record is None:
-            w1_time = time(22, 30)
-            session_date = self.get_session_date_for_time(current_dt, w1_time)
-            self.record = SessionRecord(session_date=session_date)
-
-        self.record.status = status.value
-        self.record.last_update = current_dt.isoformat()
-        self._save()
-
-    def accept_curfew(self, scheduled_shutdown_dt: datetime, current_dt: datetime, warning_1_time: time = time(22, 30)) -> None:
-        """Records curfew acceptance and schedules shutdown."""
-        if self.record is None:
-            self.record = SessionRecord(session_date=self.get_session_date_for_time(current_dt, warning_1_time))
-
-        self.record.status = CurfewStatus.SHUTDOWN_PENDING.value
-        self.record.curfew_accepted = True
-        self.record.shutdown_scheduled_for = scheduled_shutdown_dt.isoformat()
-        self.record.last_update = current_dt.isoformat()
-        self._save()
-
-    def grant_emergency(self, reason: str, current_dt: datetime) -> None:
-        """
-        Grants emergency exception, cancelling shutdown for tonight.
-        Permanently resolves tonight's session.
-        """
-        if self.record is None:
-            w1_time = time(22, 30)
-            self.record = SessionRecord(session_date=self.get_session_date_for_time(current_dt, w1_time))
-
-        self.record.status = CurfewStatus.EMERGENCY_EXCEPTION.value
-        self.record.emergency_reason = reason
-        self.record.emergency_timestamp = current_dt.isoformat()
-        self.record.last_update = current_dt.isoformat()
-        self._save()
-
-    def mark_shutdown_initiated(self, current_dt: datetime) -> None:
-        """Records that the shutdown command has been dispatched to Windows."""
-        if self.record is None:
-            w1_time = time(22, 30)
-            self.record = SessionRecord(session_date=self.get_session_date_for_time(current_dt, w1_time))
-
-        self.record.status = CurfewStatus.SHUTDOWN_INITIATED.value
-        self.record.shutdown_initiated_at = current_dt.isoformat()
-        self.record.last_update = current_dt.isoformat()
-        self._save()
-
-    def mark_shutdown_completed(self, current_dt: datetime) -> None:
-        """
-        Marks shutdown successfully completed.
-        This permanently resolves this curfew session so that reboots later that night or at 12:00 AM
-        will never trigger another curfew.
-        """
-        if self.record is None:
-            w1_time = time(22, 30)
-            self.record = SessionRecord(session_date=self.get_session_date_for_time(current_dt, w1_time))
-
-        self.record.status = CurfewStatus.SHUTDOWN_COMPLETED.value
-        self.record.shutdown_initiated_at = current_dt.isoformat()
-        self.record.last_update = current_dt.isoformat()
-        self._save()
-
-    def cancel_pending_shutdown(self, current_dt: datetime) -> None:
-        """Manually aborts pending shutdown."""
-        if self.record is not None:
-            self.record.status = CurfewStatus.SHUTDOWN_CANCELLED.value
-            self.record.shutdown_scheduled_for = None
-            self.record.last_update = current_dt.isoformat()
-            self._save()
-
-    def mark_shutdown_failed(self, current_dt: datetime) -> None:
-        """Records that shutdown execution failed."""
-        if self.record is not None:
-            self.record.status = CurfewStatus.SHUTDOWN_FAILED.value
-            self.record.last_update = current_dt.isoformat()
-            self._save()
-
-    def reset_to_normal(self, current_dt: datetime, warning_1_time: time = time(22, 30)) -> None:
-        """Resets the current session back to NORMAL, clearing any emergency exception or cancellation."""
-        session_date = self.get_session_date_for_time(current_dt, warning_1_time)
+    def start_session(self, session_date: str, current_dt: datetime) -> None:
+        """Creates a fresh record for a new night."""
         self.record = SessionRecord(
             session_date=session_date,
             status=CurfewStatus.NORMAL.value,
@@ -237,8 +124,101 @@ class StateManager:
         )
         self._save()
 
+    def _ensure_record(self, current_dt: datetime, warning_1_time: time = time(22, 30)) -> SessionRecord:
+        if self.record is None:
+            self.record = SessionRecord(session_date=self.get_session_date_for_time(current_dt, warning_1_time))
+        return self.record
+
+    def heartbeat(self, current_dt: datetime, every_seconds: float = 10.0) -> None:
+        """Records that the app is alive (throttled), so a later start can tell the PC was off."""
+        if self.record is None:
+            return
+        last = self.last_seen()
+        if last is None or (current_dt - last).total_seconds() >= every_seconds or current_dt < last:
+            self.record.last_seen = current_dt.isoformat()
+            self._save()
+
+    def last_seen(self) -> Optional[datetime]:
+        if self.record is None or not self.record.last_seen:
+            return None
+        try:
+            return datetime.fromisoformat(self.record.last_seen)
+        except ValueError:
+            return None
+
+    def has_fired(self, event_key: str) -> bool:
+        return self.record is not None and event_key in self.record.fired_events
+
+    def mark_fired(self, event_key: str, current_dt: datetime) -> None:
+        rec = self._ensure_record(current_dt)
+        if event_key not in rec.fired_events:
+            rec.fired_events.append(event_key)
+            rec.last_update = current_dt.isoformat()
+            self._save()
+
+    def set_status(self, status: CurfewStatus, current_dt: datetime) -> None:
+        rec = self._ensure_record(current_dt)
+        rec.status = status.value
+        rec.last_update = current_dt.isoformat()
+        self._save()
+
+    def resolve(self, status: CurfewStatus, current_dt: datetime) -> None:
+        """Closes tonight's session with the given outcome."""
+        rec = self._ensure_record(current_dt)
+        rec.status = status.value
+        rec.shutdown_scheduled_for = None
+        rec.last_update = current_dt.isoformat()
+        self._save()
+
+    def accept_curfew(self, scheduled_shutdown_dt: datetime, current_dt: datetime, warning_1_time: time = time(22, 30)) -> None:
+        """Curfew began: starts the grace countdown to scheduled_shutdown_dt."""
+        rec = self._ensure_record(current_dt, warning_1_time)
+        rec.status = CurfewStatus.SHUTDOWN_PENDING.value
+        rec.curfew_accepted = True
+        rec.shutdown_scheduled_for = scheduled_shutdown_dt.isoformat()
+        rec.last_update = current_dt.isoformat()
+        self._save()
+
+    def grant_emergency(self, reason: str, current_dt: datetime) -> None:
+        rec = self._ensure_record(current_dt)
+        rec.status = CurfewStatus.EMERGENCY_EXCEPTION.value
+        rec.emergency_reason = reason
+        rec.emergency_timestamp = current_dt.isoformat()
+        rec.shutdown_scheduled_for = None
+        rec.last_update = current_dt.isoformat()
+        self._save()
+
+    def mark_shutdown_initiated(self, current_dt: datetime) -> None:
+        rec = self._ensure_record(current_dt)
+        rec.status = CurfewStatus.SHUTDOWN_INITIATED.value
+        rec.shutdown_initiated_at = current_dt.isoformat()
+        rec.last_update = current_dt.isoformat()
+        self._save()
+
+    def mark_shutdown_completed(self, current_dt: datetime) -> None:
+        """Tonight is done: turning the PC back on later never triggers another curfew."""
+        rec = self._ensure_record(current_dt)
+        rec.status = CurfewStatus.SHUTDOWN_COMPLETED.value
+        rec.shutdown_initiated_at = current_dt.isoformat()
+        rec.shutdown_scheduled_for = None
+        rec.last_update = current_dt.isoformat()
+        self._save()
+
+    def cancel_pending_shutdown(self, current_dt: datetime) -> None:
+        if self.record is not None:
+            self.resolve(CurfewStatus.SHUTDOWN_CANCELLED, current_dt)
+
+    def mark_shutdown_failed(self, current_dt: datetime) -> None:
+        if self.record is not None:
+            self.resolve(CurfewStatus.SHUTDOWN_FAILED, current_dt)
+
+    def reset_to_normal(self, current_dt: datetime, warning_1_time: time = time(22, 30)) -> None:
+        """Re-arms tonight's session (clears emergency/cancellation and fired events)."""
+        self.start_session(self.get_session_date_for_time(current_dt, warning_1_time), current_dt)
+
+    # --- Queries -----------------------------------------------------------------------
+
     def get_status(self) -> CurfewStatus:
-        """Returns the current status enum."""
         if self.record is None:
             return CurfewStatus.NORMAL
         try:
@@ -247,13 +227,11 @@ class StateManager:
             return CurfewStatus.NORMAL
 
     def get_remaining_seconds_until_shutdown(self, current_dt: datetime) -> Optional[float]:
-        """Returns seconds remaining until scheduled shutdown if pending, or None."""
-        if self.record and self.record.status == CurfewStatus.SHUTDOWN_PENDING.value:
-            if self.record.shutdown_scheduled_for:
-                try:
-                    sched_dt = datetime.fromisoformat(self.record.shutdown_scheduled_for)
-                    diff = (sched_dt - current_dt).total_seconds()
-                    return max(0.0, diff)
-                except Exception:
-                    return None
+        """Seconds remaining until the scheduled shutdown if one is pending, else None."""
+        if self.record and self.record.status == CurfewStatus.SHUTDOWN_PENDING.value and self.record.shutdown_scheduled_for:
+            try:
+                sched_dt = datetime.fromisoformat(self.record.shutdown_scheduled_for)
+                return max(0.0, (sched_dt - current_dt).total_seconds())
+            except Exception:
+                return None
         return None

@@ -102,6 +102,7 @@ class NotificationManager:
                 text=True,
                 timeout=5,
                 check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             return result.returncode == 0
         except Exception as e:

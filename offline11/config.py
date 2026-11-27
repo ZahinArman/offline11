@@ -10,7 +10,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def get_default_data_dir() -> Path:
@@ -22,6 +22,19 @@ def get_default_data_dir() -> Path:
         path = Path.home() / ".offline11"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+# (event key, config field, human label) in timeline order.
+MILESTONES: List[Tuple[str, str, str]] = [
+    ("warning_1", "warning_1_time", "First Warning"),
+    ("warning_2", "warning_2_time", "Final Warning"),
+    ("curfew", "curfew_time", "Curfew"),
+    ("reminder_1", "grace_reminder_1_time", "Grace Reminder 1"),
+    ("reminder_2", "grace_reminder_2_time", "Grace Reminder 2"),
+    ("final_warning", "final_warning_time", "Last-Minute Warning"),
+    ("shutdown", "shutdown_time", "Shutdown"),
+]
+MILESTONE_FIELDS: Dict[str, str] = {label: field for _, field, label in MILESTONES}
 
 
 @dataclass
@@ -59,33 +72,33 @@ class Config:
         val = getattr(self, field_name)
         return self.parse_time_str(val)
 
+    def milestone_offsets(self) -> List[Tuple[str, str, int]]:
+        """
+        Returns (key, label, minutes after Warning 1) for every milestone.
+        Offsets wrap around midnight, so a schedule like 23:30 -> 00:15 is valid.
+        """
+        start = self.get_time_obj("warning_1_time")
+        start_min = start.hour * 60 + start.minute
+        result = []
+        for key, field_name, label in MILESTONES:
+            t = self.get_time_obj(field_name)
+            result.append((key, label, (t.hour * 60 + t.minute - start_min) % (24 * 60)))
+        return result
+
+    def minutes_between(self, key_a: str, key_b: str) -> int:
+        """Minutes from milestone key_a to milestone key_b (both from MILESTONES)."""
+        offsets = {k: off for k, _, off in self.milestone_offsets()}
+        return offsets[key_b] - offsets[key_a]
+
     def validate(self) -> None:
-        """Validates that all schedule times are in sequential order."""
-        t_w1 = self.get_time_obj("warning_1_time")
-        t_w2 = self.get_time_obj("warning_2_time")
-        t_curfew = self.get_time_obj("curfew_time")
-        t_r1 = self.get_time_obj("grace_reminder_1_time")
-        t_r2 = self.get_time_obj("grace_reminder_2_time")
-        t_final = self.get_time_obj("final_warning_time")
-        t_shutdown = self.get_time_obj("shutdown_time")
-
-        times = [
-            ("Warning 1", t_w1),
-            ("Warning 2", t_w2),
-            ("Curfew", t_curfew),
-            ("Grace Reminder 1", t_r1),
-            ("Grace Reminder 2", t_r2),
-            ("Final Warning", t_final),
-            ("Shutdown", t_shutdown),
-        ]
-
-        for i in range(len(times) - 1):
-            name_a, time_a = times[i]
-            name_b, time_b = times[i + 1]
-            if time_a >= time_b:
+        """Validates that all schedule times are in order (the schedule may cross midnight)."""
+        offsets = self.milestone_offsets()
+        for (_, name_a, off_a), (_, name_b, off_b) in zip(offsets, offsets[1:]):
+            if off_a >= off_b:
+                fa = self.to_dict()[MILESTONE_FIELDS[name_a]]
+                fb = self.to_dict()[MILESTONE_FIELDS[name_b]]
                 raise ValueError(
-                    f"Schedule sequence error: {name_a} ({time_a.strftime('%H:%M')}) "
-                    f"must be earlier than {name_b} ({time_b.strftime('%H:%M')})."
+                    f"Schedule sequence error: {name_a} ({fa}) must come before {name_b} ({fb})."
                 )
 
         if self.shutdown_grace_seconds < 0 or self.shutdown_grace_seconds > 300:

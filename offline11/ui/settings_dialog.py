@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Callable
+from typing import Callable, Optional
 
 from offline11.autostart import disable_autostart, enable_autostart, is_autostart_enabled
 from offline11.config import Config, ConfigManager
@@ -82,7 +82,7 @@ class SettingsDialog(tk.Toplevel):
         # Schedule Section
         sched_frame = tk.LabelFrame(
             container,
-            text=" Daily Curfew Schedule (HH:MM 24-Hour) ",
+            text=" Daily Curfew Schedule (HH:MM 24-hour, may cross midnight) ",
             font=FONT_BODY_BOLD,
             fg=TEXT_SECONDARY,
             bg=BG_DARK,

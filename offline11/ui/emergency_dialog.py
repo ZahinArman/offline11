@@ -39,10 +39,11 @@ class EmergencyDialog(tk.Toplevel):
         self.geometry("520x420")
         self.resizable(False, False)
 
-        # Center on screen and keep on top
+        # Keep on top. Deliberately NOT transient()/grab_set(): when the dashboard is hidden in the
+        # tray, a transient child inherits the hidden state and its grab freezes every window.
         self.attributes("-topmost", True)
-        self.transient(parent)
-        self.grab_set()
+        self.lift()
+        self.focus_force()
 
         self._build_ui()
         self._center_window()
@@ -184,9 +185,5 @@ class EmergencyDialog(tk.Toplevel):
     def _on_submit(self) -> None:
         reason = self.reason_text.get("1.0", tk.END).strip()
         if reason and self.confirm_var.get():
-            try:
-                self.grab_release()
-            except Exception:
-                pass
             self.destroy()
             self.on_confirm(reason)

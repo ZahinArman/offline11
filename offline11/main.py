@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import sys
+import tempfile
 import tkinter as tk
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -77,33 +78,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def configure_test_mode(config: Config, now: datetime) -> Config:
-    """Configures a compressed schedule starting immediately for safe end-to-end testing."""
-    config.dry_run = True  # Always dry-run during test mode
-    # Timeline relative to current time:
-    # +10s: Warning 1
-    # +20s: Warning 2
-    # +30s: Curfew Begins
-    # +35s: Reminder 1
-    # +40s: Reminder 2
-    # +45s: Final warning
-    # +50s: Shutdown
-    t1 = (now + timedelta(seconds=10)).time()
-    t2 = (now + timedelta(seconds=20)).time()
-    tc = (now + timedelta(seconds=30)).time()
-    tr1 = (now + timedelta(seconds=35)).time()
-    tr2 = (now + timedelta(seconds=40)).time()
-    tf = (now + timedelta(seconds=45)).time()
-    ts = (now + timedelta(seconds=50)).time()
-
-    config.warning_1_time = t1.strftime("%H:%M")
-    config.warning_2_time = t2.strftime("%H:%M")
-    config.curfew_time = tc.strftime("%H:%M")
-    config.grace_reminder_1_time = tr1.strftime("%H:%M")
-    config.grace_reminder_2_time = tr2.strftime("%H:%M")
-    config.final_warning_time = tf.strftime("%H:%M")
-    config.shutdown_time = ts.strftime("%H:%M")
-    return config
+def make_test_clock(config: Config, now: datetime) -> VirtualTimeProvider:
+    """
+    Test mode: plays YOUR configured schedule on a fast virtual clock so the whole night
+    (first warning -> shutdown) takes about 60 seconds of real time.
+    """
+    offsets = {key: off for key, _, off in config.milestone_offsets()}
+    span_seconds = offsets["shutdown"] * 60
+    w1 = config.get_time_obj("warning_1_time")
+    factor = max(1.0, span_seconds / 50.0)  # whole schedule plays in ~50 real seconds
+    first_warning = datetime.combine(now.date(), w1, tzinfo=now.tzinfo)
+    start = first_warning - timedelta(seconds=10 * factor)  # ~10 real seconds of lead-in
+    return VirtualTimeProvider(initial_dt=start, acceleration_factor=factor, running=True)
 
 
 def main() -> None:
@@ -143,19 +129,25 @@ def main() -> None:
 
         # 4. Clock and Time Provider
         time_provider: TimeProvider
-        if args.accelerated > 0:
-            time_provider = VirtualTimeProvider(acceleration_factor=args.accelerated)
+        simulated = args.test_mode or args.accelerated > 0
+        if args.test_mode:
+            config_mgr.config.dry_run = True  # never shut down for real in test mode
+            time_provider = make_test_clock(config_mgr.config, datetime.now().astimezone())
+            logging.info("SAFE TEST MODE: replaying your schedule in about 60 seconds.")
+        elif args.accelerated > 0:
+            time_provider = VirtualTimeProvider(acceleration_factor=args.accelerated, running=True)
         else:
             time_provider = RealTimeProvider()
 
-        if args.test_mode:
-            now_dt = time_provider.now()
-            config_mgr.config = configure_test_mode(config_mgr.config, now_dt)
-            logging.info("SAFE TEST MODE activated with 60-second compressed schedule.")
-
         # 5. Core Services
-        audit_logger = AuditLogger()
-        state_mgr = StateManager()
+        # Simulated clocks use a throwaway state/audit folder so they can never affect the real night.
+        if simulated:
+            sim_dir = Path(tempfile.mkdtemp(prefix="offline11_sim_"))
+            audit_logger = AuditLogger(log_path=sim_dir / "audit.log")
+            state_mgr = StateManager(state_file=sim_dir / "state.json")
+        else:
+            audit_logger = AuditLogger()
+            state_mgr = StateManager()
         shutdown_mgr = ShutdownManager(dry_run=config_mgr.config.dry_run)
         notifications = NotificationManager(config_mgr.config)
 
@@ -173,6 +165,7 @@ def main() -> None:
             time_provider=time_provider,
             audit_logger=audit_logger,
             shutdown_mgr=shutdown_mgr,
+            detect_resume=not simulated,
         )
 
         # 6. Build GUI Dashboard (wires scheduler milestones, popups, and notification alerts)
@@ -196,6 +189,7 @@ def main() -> None:
             main_window.after(0, lambda: (main_window.show_from_tray(), main_window._open_audit()))
 
         def _exit_app() -> None:
+            audit_logger.log("APP_EXIT", "OFFLINE 11 was exited from the tray menu.", dt=time_provider.now())
             main_window.after(0, main_window.destroy)
 
         tray = SystemTray(

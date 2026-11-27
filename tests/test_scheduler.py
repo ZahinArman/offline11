@@ -41,6 +41,7 @@ class TestScheduler(unittest.TestCase):
             time_provider=self.time_provider,
             audit_logger=self.audit_logger,
             shutdown_mgr=self.shutdown_mgr,
+            detect_resume=False,  # these tests jump the clock; resume detection is tested separately
         )
 
         self.events_received = []
@@ -167,11 +168,10 @@ class TestScheduler(unittest.TestCase):
             self.scheduler.tick()
         self.assertEqual(self.events_received.count("warning_1"), 1)
 
-    def test_sleep_and_wake_time_jump(self) -> None:
+    def test_app_started_late_while_pc_already_on(self) -> None:
         """
-        Verifies system waking from sleep:
-        PC was sleeping from 22:15 to 23:08. On wake, it should handle missed curfew
-        and enter SHUTDOWN_PENDING for 23:15.
+        With resume detection off (app launched late on a PC that was already on),
+        the curfew still starts and only the countdown to the shutdown time remains.
         """
         # Sleep jumped to 23:08
         self.time_provider.set_time(datetime(2026, 10, 14, 23, 8, tzinfo=self.local_tz))

@@ -117,7 +117,8 @@ def setup_app_logging(log_dir: Optional[Path] = None, debug: bool = False) -> lo
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "app.log"
 
-    root_logger = logging.getLogger("offline11")
+    # Modules call logging.info(...) on the root logger, so the handlers must live there.
+    root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
     # Avoid duplicate handlers if re-initialized
@@ -132,7 +133,7 @@ def setup_app_logging(log_dir: Optional[Path] = None, debug: bool = False) -> lo
         file_handler.setLevel(logging.DEBUG if debug else logging.INFO)
         root_logger.addHandler(file_handler)
 
-        console_handler = logging.StreamHandler()
+        console_handler = logging.StreamHandler()  # no-op under pythonw/--noconsole
         console_handler.setFormatter(formatter)
         console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
         root_logger.addHandler(console_handler)

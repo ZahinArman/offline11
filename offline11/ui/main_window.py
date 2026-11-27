@@ -7,7 +7,6 @@ and controls for settings, audit log, and emergency cancellation.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
 import tkinter as tk
 from tkinter import messagebox
 from typing import Callable, Optional
@@ -267,6 +266,7 @@ class MainWindow(tk.Tk):
         # Action Buttons Grid (2 rows for clean layout)
         btn_grid = tk.Frame(container, bg=BG_DARK)
         btn_grid.pack(fill=tk.X, pady=(0, 16))
+        self._btn_grid = btn_grid
 
         # Row 1: Primary Controls
         row1 = tk.Frame(btn_grid, bg=BG_DARK)
@@ -363,6 +363,8 @@ class MainWindow(tk.Tk):
         )
 
     def _on_settings_saved(self, new_config: Config) -> None:
+        # The scheduler must see the new schedule right away (previously it kept the old one).
+        self.scheduler.config = new_config
         self.lbl_w1.config(text=new_config.warning_1_time)
         self.lbl_curfew.config(text=new_config.curfew_time)
         self.lbl_shutdown.config(text=new_config.shutdown_time)
@@ -394,19 +396,30 @@ class MainWindow(tk.Tk):
         )
 
     def _trigger_test_curfew(self) -> None:
-        """Triggers the curfew dialog immediately for safe testing."""
-        if not self.config_mgr.config.dry_run:
-            confirm = messagebox.askyesno(
-                "Test Curfew in Live Mode?",
-                "Live enforcement is currently enabled.\n"
-                "We recommend enabling Dry-Run mode before testing.\n\n"
-                "Do you still wish to test curfew dialog right now?",
+        """Shows a preview of the curfew dialog. Never changes tonight's state or schedules anything."""
+        def _preview_done(choice: str) -> None:
+            messagebox.showinfo(
+                "Curfew Preview",
+                f"Preview only. You chose: {choice}.\n\nNothing was scheduled and tonight's curfew is unaffected.",
                 parent=self,
             )
-            if not confirm:
-                return
 
-        self._show_curfew_dialog()
+        CurfewDialog(
+            parent=self,
+            on_no_emergency=lambda: _preview_done("NO EMERGENCY"),
+            on_genuine_emergency=lambda: _preview_done("GENUINE EMERGENCY"),
+            info_text=self._curfew_info_text(),
+            is_preview=True,
+        )
+
+    def _curfew_info_text(self) -> str:
+        cfg = self.config_mgr.config
+        grace = cfg.minutes_between("curfew", "shutdown")
+        return (
+            f"Selecting NO EMERGENCY keeps the {self._plural_minutes(grace)} grace period (shutdown at {cfg.shutdown_time}) "
+            "so you can save your work and close applications.\n\n"
+            "Ignoring this dialog will NOT cancel or delay the scheduled shutdown."
+        )
 
     def _show_curfew_dialog(self) -> None:
         if self.curfew_dialog is None or not self.curfew_dialog.winfo_exists():
@@ -414,6 +427,7 @@ class MainWindow(tk.Tk):
                 parent=self,
                 on_no_emergency=self._handle_no_emergency_curfew,
                 on_genuine_emergency=self._handle_emergency_curfew,
+                info_text=self._curfew_info_text(),
             )
 
     def _handle_no_emergency_curfew(self) -> None:
@@ -498,38 +512,44 @@ class MainWindow(tk.Tk):
         )
 
     # Scheduler Event Callbacks
+    @staticmethod
+    def _plural_minutes(mins: int) -> str:
+        return f"{mins} minute" if mins == 1 else f"{mins} minutes"
+
     def _on_warning_1_event(self) -> None:
+        cfg = self.config_mgr.config
+        mins = cfg.minutes_between("warning_1", "curfew")
         if self.notifications:
             self.notifications.notify(
-                title="OFFLINE 11: 30-Minute Warning",
-                message="30 minutes until PC curfew. Finish what you're doing and start winding down.",
+                title=f"OFFLINE 11: {mins}-Minute Warning",
+                message=f"{self._plural_minutes(mins)} until PC curfew. Finish what you're doing and start winding down.",
                 sound_type="warning",
                 push_priority="default",
                 push_tags="clock",
             )
-        curfew_t = self.config_mgr.config.curfew_time
         self._show_warning_dialog(
-            tag_text="30-Minute Warning",
-            title="30 MINUTES REMAINING",
-            message=f"Curfew begins in 30 minutes (at {curfew_t}).\nFinish your current task and start winding down.",
+            tag_text=f"{mins}-Minute Warning",
+            title=f"{self._plural_minutes(mins).upper()} REMAINING",
+            message=f"Curfew begins in {self._plural_minutes(mins)} (at {cfg.curfew_time}).\nFinish your current task and start winding down.",
             level="warning",
             auto_close_seconds=30,
         )
 
     def _on_warning_2_event(self) -> None:
+        cfg = self.config_mgr.config
+        mins = cfg.minutes_between("warning_2", "curfew")
         if self.notifications:
             self.notifications.notify(
-                title="OFFLINE 11: 10-Minute Warning",
-                message="10 minutes until PC curfew. Save your work and close everything.",
+                title=f"OFFLINE 11: {mins}-Minute Warning",
+                message=f"{self._plural_minutes(mins)} until PC curfew. Save your work and close everything.",
                 sound_type="urgent",
                 push_priority="high",
                 push_tags="warning",
             )
-        curfew_t = self.config_mgr.config.curfew_time
         self._show_warning_dialog(
             tag_text="Final Curfew Warning",
-            title="10 MINUTES REMAINING",
-            message=f"Curfew begins in 10 minutes (at {curfew_t})!\nSave all open work and close applications now.",
+            title=f"{self._plural_minutes(mins).upper()} REMAINING",
+            message=f"Curfew begins in {self._plural_minutes(mins)} (at {cfg.curfew_time})!\nSave all open work and close applications now.",
             level="urgent",
             auto_close_seconds=30,
         )
@@ -552,56 +572,33 @@ class MainWindow(tk.Tk):
             )
         self._show_curfew_dialog()
 
-    def _on_grace_reminder_1(self) -> None:
+    def _shutdown_reminder(self, key: str, level: str, sound: str, push_priority: str, push_tags: str, tag_text: str) -> None:
+        cfg = self.config_mgr.config
+        mins_txt = self._plural_minutes(cfg.minutes_between(key, "shutdown"))
         if self.notifications:
             self.notifications.notify(
-                title="OFFLINE 11: 10 Minutes Until Shutdown",
-                message="10 minutes until PC shutdown. Save all open files.",
-                sound_type="warning",
-                push_priority="high",
-                push_tags="warning",
+                title=f"OFFLINE 11: {mins_txt} Until Shutdown",
+                message=f"{mins_txt} until PC shutdown (at {cfg.shutdown_time}). Save your work and close your applications.",
+                sound_type=sound,
+                push_priority=push_priority,
+                push_tags=push_tags,
             )
         self._show_warning_dialog(
-            tag_text="Grace Period Reminder",
-            title="10 MINUTES UNTIL SHUTDOWN",
-            message="10 minutes remaining until system power-off.\nPlease save all open files and documents immediately.",
-            level="urgent",
-            auto_close_seconds=20,
+            tag_text=tag_text,
+            title=f"{mins_txt.upper()} UNTIL SHUTDOWN",
+            message=f"{mins_txt} remaining until the PC shuts down (at {cfg.shutdown_time}).\nSave all open files and close your applications now.",
+            level=level,
+            auto_close_seconds=30 if level == "critical" else 20,
         )
+
+    def _on_grace_reminder_1(self) -> None:
+        self._shutdown_reminder("reminder_1", "urgent", "warning", "high", "warning", "Grace Period Reminder")
 
     def _on_grace_reminder_2(self) -> None:
-        if self.notifications:
-            self.notifications.notify(
-                title="OFFLINE 11: 5 Minutes Until Shutdown",
-                message="5 minutes until PC shutdown. Close all open applications.",
-                sound_type="urgent",
-                push_priority="urgent",
-                push_tags="hourglass",
-            )
-        self._show_warning_dialog(
-            tag_text="Urgent Shutdown Reminder",
-            title="5 MINUTES UNTIL SHUTDOWN",
-            message="5 minutes remaining! Close all open applications now to prevent data loss.",
-            level="urgent",
-            auto_close_seconds=20,
-        )
+        self._shutdown_reminder("reminder_2", "urgent", "urgent", "urgent", "hourglass", "Urgent Shutdown Reminder")
 
     def _on_final_warning(self) -> None:
-        if self.notifications:
-            self.notifications.notify(
-                title="OFFLINE 11: Final 1-Minute Warning",
-                message="PC shutdown will initiate in 1 minute. Prepare for power off.",
-                sound_type="urgent",
-                push_priority="max",
-                push_tags="skull",
-            )
-        self._show_warning_dialog(
-            tag_text="CRITICAL WARNING",
-            title="1 MINUTE UNTIL SHUTDOWN",
-            message="System shutdown will begin in 60 seconds!\nAll open applications will be closed.",
-            level="critical",
-            auto_close_seconds=30,
-        )
+        self._shutdown_reminder("final_warning", "critical", "urgent", "max", "skull", "Final Warning")
 
     def _on_shutdown_executed(self, success: bool, msg: str) -> None:
         if self.countdown_widget and self.countdown_widget.winfo_exists():
@@ -641,39 +638,29 @@ class MainWindow(tk.Tk):
         self._update_display()
 
     def _update_display(self) -> None:
-        status = self.state_mgr.get_status()
+        now = self.time_provider.now()
+        status = self.scheduler.tonight_status(now)
         self.status_badge.config(text=status.value)
 
-        # Style status badge and action banners
-        if status == CurfewStatus.NORMAL:
-            self.status_badge.config(bg=BG_BUTTON, fg=TEXT_PRIMARY)
-            self.cancel_frame.pack_forget()
-            self.rearm_frame.pack_forget()
-        elif status == CurfewStatus.SHUTDOWN_PENDING:
-            self.status_badge.config(bg=BG_CRITICAL, fg=TEXT_PRIMARY)
-            self.cancel_frame.pack(fill=tk.X, pady=(0, 16))
-            self.rearm_frame.pack_forget()
-        elif status in (CurfewStatus.EMERGENCY_EXCEPTION, CurfewStatus.SHUTDOWN_CANCELLED):
-            self.status_badge.config(bg="#1E3A8A", fg=TEXT_PRIMARY)
-            self.cancel_frame.pack_forget()
-            self.rearm_frame.pack(fill=tk.X, pady=(0, 16))
-        elif status == CurfewStatus.SHUTDOWN_COMPLETED:
-            self.status_badge.config(bg="#064E3B", fg=TEXT_PRIMARY)
-            self.cancel_frame.pack_forget()
-            self.rearm_frame.pack_forget()
-        elif status == CurfewStatus.SHUTDOWN_FAILED:
-            self.status_badge.config(bg=TEXT_DANGER, fg=TEXT_PRIMARY)
-            self.cancel_frame.pack_forget()
-            self.rearm_frame.pack_forget()
-        else:
-            self.status_badge.config(bg=BG_BUTTON, fg=TEXT_PRIMARY)
-            self.cancel_frame.pack_forget()
-            self.rearm_frame.pack_forget()
+        show_cancel = status == CurfewStatus.SHUTDOWN_PENDING
+        show_rearm = status in (CurfewStatus.EMERGENCY_EXCEPTION, CurfewStatus.SHUTDOWN_CANCELLED)
+        badge_bg = {
+            CurfewStatus.SHUTDOWN_PENDING: BG_CRITICAL,
+            CurfewStatus.EMERGENCY_EXCEPTION: "#1E3A8A",
+            CurfewStatus.SHUTDOWN_CANCELLED: "#1E3A8A",
+            CurfewStatus.SKIPPED: "#1E3A8A",
+            CurfewStatus.SHUTDOWN_COMPLETED: "#064E3B",
+            CurfewStatus.SHUTDOWN_FAILED: TEXT_DANGER,
+        }.get(status, BG_BUTTON)
+        self.status_badge.config(bg=badge_bg, fg=TEXT_PRIMARY)
+        for frame, visible in ((self.cancel_frame, show_cancel), (self.rearm_frame, show_rearm)):
+            if visible and not frame.winfo_ismapped():
+                frame.pack(fill=tk.X, pady=(0, 16), before=self._btn_grid)
+            elif not visible and frame.winfo_ismapped():
+                frame.pack_forget()
 
-        # Update Timer / Countdown
-        now = self.time_provider.now()
         rem_seconds = self.state_mgr.get_remaining_seconds_until_shutdown(now)
-        if rem_seconds is not None and status == CurfewStatus.SHUTDOWN_PENDING:
+        if status == CurfewStatus.SHUTDOWN_PENDING and rem_seconds is not None:
             mins = int(rem_seconds) // 60
             secs = int(rem_seconds) % 60
             self.event_timer_lbl.config(text=f"{mins:02d}:{secs:02d}", fg=TEXT_DANGER)
@@ -682,25 +669,25 @@ class MainWindow(tk.Tk):
                 self.countdown_widget.update_remaining(rem_seconds)
             else:
                 self._show_countdown_widget()
-        else:
-            # Show time to curfew
-            w1_time = self.config_mgr.config.get_time_obj("warning_1_time")
-            session_date = StateManager.get_session_date_for_time(now, w1_time)
+            return
 
-            if self.state_mgr.record and self.state_mgr.record.session_date == session_date and self.state_mgr.record.is_resolved():
-                self.event_timer_lbl.config(text="RESOLVED", fg=TEXT_ACCENT)
-                self.event_desc_lbl.config(text="Curfew completed for this session. Normal usage allowed.")
-            else:
-                curfew_time = self.config_mgr.config.get_time_obj("curfew_time")
-                curfew_dt = datetime.combine(now.date(), curfew_time, tzinfo=now.tzinfo)
-                if now > curfew_dt:
-                    curfew_dt += timedelta(days=1)
-                diff = (curfew_dt - now).total_seconds()
-                hours = int(diff) // 3600
-                mins = (int(diff) % 3600) // 60
-                secs = int(diff) % 60
-                self.event_timer_lbl.config(text=f"{hours:02d}:{mins:02d}:{secs:02d}", fg=TEXT_PRIMARY)
-                self.event_desc_lbl.config(text=f"Time until curfew ({self.config_mgr.config.curfew_time})")
+        # Not counting down: make sure no stale countdown window lingers.
+        if self.countdown_widget and self.countdown_widget.winfo_exists():
+            self.countdown_widget.destroy()
+        self.countdown_widget = None
+
+        next_curfew = self.scheduler.next_curfew_dt(now)
+        diff = max(0, int((next_curfew - now).total_seconds()))
+        self.event_timer_lbl.config(text=f"{diff // 3600:02d}:{(diff % 3600) // 60:02d}:{diff % 60:02d}", fg=TEXT_PRIMARY)
+        done_tonight = status in (
+            CurfewStatus.SHUTDOWN_COMPLETED,
+            CurfewStatus.SHUTDOWN_INITIATED,
+            CurfewStatus.EMERGENCY_EXCEPTION,
+            CurfewStatus.SHUTDOWN_CANCELLED,
+            CurfewStatus.SKIPPED,
+        )
+        prefix = "Done for tonight. " if done_tonight else ""
+        self.event_desc_lbl.config(text=f"{prefix}Time until next curfew ({next_curfew.strftime('%a %H:%M')})")
 
     def hide_to_tray(self) -> None:
         """Hides the main window to the system tray."""

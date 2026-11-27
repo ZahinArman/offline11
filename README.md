@@ -15,10 +15,10 @@
 Modern screen-time and focus tools have a fundamental flaw: **they are too polite.** They pop up easily-dismissed notifications, rely on browser extensions that can be turned off in two clicks, or drown you in colorful productivity dashboards and gamified streak counters that keep you looking at the screen longer.
 
 **OFFLINE 11 is built on the opposite philosophy:**
-1. **Absolute Simplicity**: Single mission: guarantee the computer powers off at 11:15 PM every night.
+1. **Absolute Simplicity**: Single mission: power the computer off once per night, at the time *you* choose (11:15 PM by default).
 2. **Hard to Casually Bypass**: Prominent topmost modal prompts, persistent floating grace-period countdowns, and real Windows shutdown triggers.
 3. **Respect for Sleep & Autonomy**: Distinguishes between mindless procrastination (gaming, late-night browsing) and genuine emergencies (medical, critical server outages). Emergency exceptions require written rationale and accountability confirmation.
-4. **Zero Nagging After Curfew**: Once tonight's curfew is resolved (either via shutdown or confirmed emergency), it **never** triggers another shutdown or nags you if you turn the PC back on later that night or at 12:00 AM. It resets strictly at 10:30 PM the following day.
+4. **A Nudge, Never a Lockout**: The curfew is enforced at most once per night. If you turn the PC back on (or wake it from sleep) after curfew began, OFFLINE 11 assumes you had a good reason and leaves you alone, with no dialog, no countdown and no warning. The next cycle starts at the following evening's first warning.
 5. **No Telemetry, No Accounts, No Cloud**: 100% offline, local JSON state, zero tracking.
 
 ---
@@ -27,7 +27,7 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 
 1. [Key Features & Design Philosophy](#key-features--design-philosophy)
 2. [Schedule & Enforcement Timeline](#schedule--enforcement-timeline)
-3. [The Critical Requirement: Single Enforcement Per Session Date](#the-critical-requirement-single-enforcement-per-session-date)
+3. [The Core Rules: Once Per Night, Never a Lockout](#the-core-rules-once-per-night-never-a-lockout)
 4. [Architecture & Code Structure](#architecture--code-structure)
 5. [Installation & Setup (1-Click Install & Uninstall)](#installation--setup)
 6. [Running the Application](#running-the-application)
@@ -64,8 +64,8 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 > **Need a different curfew time?**  
 > While the default schedule is set for an **11:00 PM curfew / 11:15 PM shutdown**, all times are completely customizable to fit your routine:
 > 1. Click **SETTINGS** in the OFFLINE 11 dashboard.
-> 2. Edit any milestone in standard 24-hour `HH:MM` format (e.g., set Curfew to `22:00` for 10:00 PM, `00:00` for midnight, or any custom target).
-> 3. Click **SAVE SETTINGS**. The app automatically validates that your warnings and shutdown are properly sequenced.
+> 2. Edit any milestone in standard 24-hour `HH:MM` format (e.g., set Curfew to `22:00` for 10:00 PM, or `00:00` for midnight; schedules may cross midnight).
+> 3. Click **SAVE SETTINGS**. The app validates that your milestones are in order and applies the new schedule immediately (no restart needed). Warning texts follow your schedule automatically.
 
 The default 24-hour schedule operates as follows:
 
@@ -81,33 +81,22 @@ The default 24-hour schedule operates as follows:
 
 ---
 
-## The Critical Requirement: Single Enforcement Per Session Date
+## The Core Rules: Once Per Night, Never a Lockout
 
-### The Golden Rule
-> **The curfew must be enforced only once per calendar day. A completed shutdown must never trigger another shutdown when turning the computer back on later that night.**
+OFFLINE 11 is a small hiccup that tells you to stop, not a jail. These rules are enforced by the scheduler and covered by `tests/test_no_lockout.py`:
 
-### How OFFLINE 11 Solves This:
-1. **Reference Session Date**:
-   - The curfew cycle is keyed by the calendar date on which the 10:30 PM warning begins (e.g. `2026-10-14`).
-   - Any time between 11:15 PM on day $D$ and 10:30 PM on day $D+1$ belongs to the reference session of day $D$.
-2. **Permanent Resolution**:
-   - When Windows executes shutdown at 11:15 PM, state transitions to `SHUTDOWN_COMPLETED`.
-   - When the PC turns back on at **12:00 AM (midnight)**, the app detects that session `2026-10-14` is **permanently resolved**.
-   - **No dialog is shown, no countdown is restarted, and no shutdown is scheduled.**
-   - The PC operates normally throughout the morning and afternoon.
-3. **Daily Reset**:
-   - The state only resets when the next session arrives at **10:30 PM on the following day**.
+1. **Once per night.** A night's cycle (a "session") is keyed by the date of its First Warning. Once it is resolved (shutdown issued, emergency declared, countdown aborted, or skipped) nothing else happens until the next evening's First Warning.
+2. **Never locked out.** If the PC is turned on, restarted, or woken from sleep *after curfew began*, that night is skipped silently. This is detected with a small heartbeat in the state file (boot time alone is unreliable because of Windows Fast Startup). A quick app restart while the PC stays on simply resumes the countdown.
+3. **No stale popups.** Outside tonight's window nothing is shown. An unfinished night (e.g. you shut the PC down yourself during the grace period) is closed quietly, so there is no leftover countdown the next morning.
+4. **No alert replays.** Fired milestones are saved to disk, and if several are overdue at once (app started late) only the most recent one is shown.
 
-### Mandatory Acceptance Test Scenario:
-1. At **11:00 PM**, curfew dialog appears.
-2. User selects **NO EMERGENCY**.
-3. At **11:15 PM**, computer shuts down cleanly.
-4. User turns it back on at **12:00 AM**.
-5. The application starts normally without another curfew dialog or countdown.
-6. User continues using PC normally throughout the day.
-7. At **10:30 PM the following day**, the next curfew session begins as usual.
-
-*(Verified and covered by unit test `test_critical_acceptance_requirement_no_reshutdown_after_midnight` in `tests/test_state.py`.)*
+### Acceptance scenario
+1. At curfew time, the curfew dialog appears.
+2. User selects **NO EMERGENCY** (or ignores the dialog).
+3. At shutdown time, the computer shuts down.
+4. User turns it back on at **12:00 AM**: no dialog, no countdown, no warning.
+5. User uses the PC normally all day.
+6. The next evening, the cycle starts again at the First Warning.
 
 ---
 
@@ -141,6 +130,7 @@ d:\11ofDeath\
 │       └── tray.py           # System tray icon and context menu
 ├── tests/
 │   ├── test_state.py         # State transitions, date rollover, reboot at 12:00 AM acceptance test
+│   ├── test_no_lockout.py    # Once-per-night, no-lockout, no-replay and midnight-crossing rules
 │   ├── test_scheduler.py     # Timeline milestones, deduplication, time jumps
 │   ├── test_shutdown.py      # Shutdown commands, dry-run, cancellation syntax
 │   ├── test_single_instance.py # Win32 Mutex duplicate prevention
@@ -201,7 +191,7 @@ The uninstaller will prompt for confirmation and then permanently wipe:
    ```
 3. Run the installer script or run directly:
    ```cmd
-   python install.py
+   python install.py   # requires a build first (see Packaging below)
    # Or run directly:
    python offline11\main.py
    ```
@@ -246,21 +236,16 @@ Or via CLI:
 ```cmd
 python offline11\main.py --test-mode --debug
 ```
-This compresses the entire curfew sequence into a safe **60-second cycle**:
-- **+10s**: 30-minute warning toast
-- **+20s**: 10-minute warning toast
-- **+30s**: 11:00 PM Curfew modal appears (`NO EMERGENCY` vs `GENUINE EMERGENCY`)
-- **+35s**: Grace reminder 1
-- **+40s**: Grace reminder 2
-- **+45s**: Final 1-minute warning
-- **+50s**: Dry-run simulated shutdown (PC remains on)
+This replays **your configured schedule** on a fast virtual clock, so the whole night (first warning to dry-run shutdown) takes about 60 seconds. Test mode always runs in dry-run and uses a throwaway state folder, so it can never affect tonight's real curfew.
+
+The **TEST CURFEW** button on the dashboard only previews the curfew dialog. It never schedules anything.
 
 ### 2. Accelerated Virtual Clock
 Simulate hours passing in seconds using the `--accelerated` flag:
 ```cmd
 python offline11\main.py --accelerated 60 --dry-run
 ```
-*(At 60x speed, 1 real second = 1 virtual minute).*
+*(At 60x speed, 1 real second = 1 virtual minute. Uses a throwaway state folder.)*
 
 ---
 
@@ -370,7 +355,8 @@ python tests\run_all_tests.py
 
 ### Test Coverage Highlights:
 - `test_critical_acceptance_requirement_no_reshutdown_after_midnight`: Verifies the mandatory acceptance test (11:00 PM curfew -> 11:15 PM shutdown -> 12:00 AM turn on -> no reshutdown -> normal PC usage all day -> 10:30 PM next session begins).
-- `test_app_restart_during_countdown_preserves_remaining_time`: Verifies that closing or restarting the app mid-countdown resumes the exact remaining time rather than resetting to 15 minutes.
+- `test_app_restart_during_countdown_preserves_remaining_time`: Verifies that a quick app restart (PC still on) resumes the exact remaining time rather than resetting it.
+- `tests/test_no_lockout.py`: No popup the morning after, no lockout after turning the PC back on or waking it, no alert replay after restarts, abort survives restarts, settings apply live, midnight-crossing schedules.
 - `test_ignored_curfew_dialog_still_shuts_down_at_11_15`: Verifies that ignoring the dialog still enforces the 11:15 PM shutdown.
 - `test_emergency_exception_cancels_shutdown`: Verifies emergency declaration cancels shutdown for the night.
 - `test_single_instance_acquisition_and_duplicate_rejection`: Verifies duplicate instances are blocked via Win32 named Mutex.

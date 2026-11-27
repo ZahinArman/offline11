@@ -1,23 +1,37 @@
 """
 Timeline Scheduler module for OFFLINE 11.
-Manages daily curfew milestones, deduplication, time jumps, and sleep/wake handling.
+
+Rules (in priority order):
+1. Each night's schedule is enforced at most once.
+2. Never lock the user out: if the PC is turned on, restarted, or woken from sleep after
+   curfew began, tonight is skipped silently. This is detected with a heartbeat saved in the
+   state file (boot time is unreliable because of Windows Fast Startup).
+3. Alerts are never replayed: fired milestones are persisted, and when several milestones
+   are overdue at once (e.g. app started late) only the most recent one is shown.
+4. Outside tonight's window nothing happens, and any unfinished session is closed quietly.
 """
 
 from __future__ import annotations
 
-import logging
-from datetime import date, datetime, time, timedelta
-from typing import Callable, Dict, List, Optional, Set
+from datetime import date, datetime, timedelta
+from typing import Callable, Dict, Optional, Tuple
 
-from offline11.config import Config
+from offline11.config import MILESTONES, Config
 from offline11.logger import AuditLogger
 from offline11.shutdown import ShutdownManager
 from offline11.state import CurfewStatus, StateManager
 from offline11.time_provider import TimeProvider
 
+# How late the shutdown may still fire after its scheduled time (covers a slow tick).
+SHUTDOWN_TOLERANCE = timedelta(minutes=2)
+# If the app was silent longer than this, the PC was off, asleep, or restarted.
+RESUME_GAP = timedelta(seconds=60)
+
+MILESTONE_KEYS = [key for key, _, _ in MILESTONES]
+
 
 class Scheduler:
-    """Coordinates daily curfew timeline events based on the configured schedule."""
+    """Coordinates the nightly curfew timeline based on the configured schedule."""
 
     def __init__(
         self,
@@ -26,15 +40,15 @@ class Scheduler:
         time_provider: TimeProvider,
         audit_logger: AuditLogger,
         shutdown_mgr: ShutdownManager,
+        detect_resume: bool = True,
     ) -> None:
         self.config = config
         self.state_mgr = state_mgr
         self.time_provider = time_provider
         self.audit_logger = audit_logger
         self.shutdown_mgr = shutdown_mgr
-
-        # Event tracking: session_date -> set of event keys
-        self._fired_events: Dict[str, Set[str]] = {}
+        self.detect_resume = detect_resume
+        self._last_tick: Optional[datetime] = None
 
         # UI / Notification callbacks
         self.on_warning_1: Optional[Callable[[], None]] = None
@@ -46,120 +60,148 @@ class Scheduler:
         self.on_shutdown_executed: Optional[Callable[[bool, str], None]] = None
         self.on_state_change: Optional[Callable[[CurfewStatus], None]] = None
 
-    def get_session_datetime(self, session_date_str: str, time_obj: time) -> datetime:
-        """Combines session date and time with local timezone."""
-        ref_date = date.fromisoformat(session_date_str)
-        local_tz = self.time_provider.now().tzinfo
-        return datetime.combine(ref_date, time_obj, tzinfo=local_tz)
+    # --- Schedule geometry ---------------------------------------------------------------
 
-    def _has_fired(self, session_date: str, event_key: str) -> bool:
-        return event_key in self._fired_events.get(session_date, set())
+    def session_times(self, session_date: str) -> Dict[str, datetime]:
+        """Absolute datetime of every milestone in a session (handles schedules crossing midnight)."""
+        start = datetime.combine(
+            date.fromisoformat(session_date),
+            self.config.get_time_obj("warning_1_time"),
+            tzinfo=self.time_provider.now().tzinfo,
+        )
+        return {key: start + timedelta(minutes=off) for key, _, off in self.config.milestone_offsets()}
 
-    def _mark_fired(self, session_date: str, event_key: str) -> None:
-        if session_date not in self._fired_events:
-            self._fired_events[session_date] = set()
-        self._fired_events[session_date].add(event_key)
+    def current_session(self, now: datetime) -> Tuple[str, Dict[str, datetime]]:
+        session_date = StateManager.get_session_date_for_time(now, self.config.get_time_obj("warning_1_time"))
+        return session_date, self.session_times(session_date)
+
+    def is_in_window(self, now: datetime) -> bool:
+        """True between tonight's First Warning and shortly after its Shutdown time."""
+        _, times = self.current_session(now)
+        return now < times["shutdown"] + SHUTDOWN_TOLERANCE
+
+    def next_curfew_dt(self, now: datetime) -> datetime:
+        """The next curfew that will actually apply."""
+        session_date, times = self.current_session(now)
+        tonight_open = not (self.state_mgr.has_session(session_date) and self.state_mgr.record.is_resolved())
+        if now < times["curfew"] and tonight_open:
+            return times["curfew"]
+        tomorrow = (date.fromisoformat(session_date) + timedelta(days=1)).isoformat()
+        return self.session_times(tomorrow)["curfew"]
+
+    def tonight_status(self, now: datetime) -> CurfewStatus:
+        """Status to display: tonight's session status inside the window, NORMAL outside it."""
+        session_date, _ = self.current_session(now)
+        if self.is_in_window(now) and self.state_mgr.has_session(session_date):
+            return self.state_mgr.get_status()
+        return CurfewStatus.NORMAL
+
+    # --- Main loop -----------------------------------------------------------------------
 
     def tick(self) -> None:
-        """
-        Main scheduler evaluation tick.
-        Must be called periodically (e.g. every 1 second).
-        Evaluates current wall clock against the timeline.
-        """
+        """Evaluates the clock against tonight's schedule. Call about once per second."""
         now = self.time_provider.now()
-        w1_time = self.config.get_time_obj("warning_1_time")
-        current_session_date = StateManager.get_session_date_for_time(now, w1_time)
+        prev, self._last_tick = self._last_tick, now
+        session_date, times = self.current_session(now)
+        sm = self.state_mgr
 
-        # Synchronize state manager with current time
-        status = self.state_mgr.sync_for_time(now, self.config)
-
-        # If current session is already resolved (shutdown completed or emergency exception)
-        if self.state_mgr.record and self.state_mgr.record.session_date == current_session_date and self.state_mgr.record.is_resolved():
-            # Nothing to fire for a resolved session. User can use PC freely.
+        # Outside tonight's window: close any unfinished session silently and do nothing.
+        if now >= times["shutdown"] + SHUTDOWN_TOLERANCE:
+            if sm.has_session(session_date) and not sm.record.is_resolved():
+                sm.resolve(CurfewStatus.MISSED, now)
+                self.audit_logger.log("SESSION_MISSED", "Tonight's window passed without a shutdown (PC was off or asleep).", dt=now)
+                self._state_changed(CurfewStatus.MISSED)
             return
 
-        # If it's daytime before warning 1 time, no curfew events should trigger
-        if now.time() < w1_time:
+        if not sm.has_session(session_date):
+            sm.start_session(session_date, now)
+        if sm.record.is_resolved():
             return
 
-        # We are in the active session for current_session_date!
-        t_w1 = self.get_session_datetime(current_session_date, self.config.get_time_obj("warning_1_time"))
-        t_w2 = self.get_session_datetime(current_session_date, self.config.get_time_obj("warning_2_time"))
-        t_curfew = self.get_session_datetime(current_session_date, self.config.get_time_obj("curfew_time"))
-        t_r1 = self.get_session_datetime(current_session_date, self.config.get_time_obj("grace_reminder_1_time"))
-        t_r2 = self.get_session_datetime(current_session_date, self.config.get_time_obj("grace_reminder_2_time"))
-        t_final = self.get_session_datetime(current_session_date, self.config.get_time_obj("final_warning_time"))
-        t_shutdown = self.get_session_datetime(current_session_date, self.config.get_time_obj("shutdown_time"))
+        # Never lock the user out: if the PC came on (boot or wake) after curfew began, skip tonight.
+        if self.detect_resume:
+            if prev is None:
+                last_seen = sm.last_seen()  # app (re)started: was it alive a moment ago?
+                resumed = last_seen is None or now - last_seen > RESUME_GAP
+            else:
+                resumed = now - prev > RESUME_GAP  # PC slept/hibernated while the app was running
+            if resumed and now >= times["curfew"]:
+                sm.resolve(CurfewStatus.SKIPPED, now)
+                self.audit_logger.log(
+                    "SESSION_SKIPPED",
+                    "PC was turned on or woke up after curfew began. No enforcement tonight.",
+                    dt=now,
+                )
+                self._state_changed(CurfewStatus.SKIPPED)
+                return
+        sm.heartbeat(now)
 
-        # 1. First warning (10:30 PM)
-        if now >= t_w1 and not self._has_fired(current_session_date, "warning_1"):
-            self._mark_fired(current_session_date, "warning_1")
-            self.state_mgr.set_status(CurfewStatus.WARNING_1, now)
-            self.audit_logger.log("WARNING_1", "30-minute curfew warning dispatched.", dt=now)
-            if self.on_warning_1:
-                self.on_warning_1()
-            if self.on_state_change:
-                self.on_state_change(CurfewStatus.WARNING_1)
+        due = [key for key in MILESTONE_KEYS if now >= times[key]]
+        if not due:
+            return
+        latest = due[-1]
+        curfew_started_now = False
+        for key in due:
+            if sm.has_fired(key):
+                continue
+            sm.mark_fired(key, now)
+            stale = key != latest
+            if key in ("warning_1", "warning_2"):
+                if not stale:
+                    self._fire_warning(key, now)
+            elif key == "curfew":
+                if "shutdown" not in due:  # never start a countdown that has already expired
+                    self._fire_curfew(now, times)
+                    curfew_started_now = True
+            elif key == "shutdown":
+                if sm.get_status() == CurfewStatus.SHUTDOWN_PENDING:
+                    self._trigger_shutdown(now)
+                elif not sm.record.is_resolved():
+                    sm.resolve(CurfewStatus.MISSED, now)
+                    self._state_changed(CurfewStatus.MISSED)
+            elif not stale and not curfew_started_now and sm.get_status() == CurfewStatus.SHUTDOWN_PENDING:
+                self._fire_reminder(key, now, times)
 
-        # 2. Final warning (10:50 PM)
-        if now >= t_w2 and not self._has_fired(current_session_date, "warning_2"):
-            self._mark_fired(current_session_date, "warning_2")
-            self.state_mgr.set_status(CurfewStatus.WARNING_2, now)
-            self.audit_logger.log("WARNING_2", "10-minute curfew warning dispatched.", dt=now)
-            if self.on_warning_2:
-                self.on_warning_2()
-            if self.on_state_change:
-                self.on_state_change(CurfewStatus.WARNING_2)
+    def _state_changed(self, status: CurfewStatus) -> None:
+        if self.on_state_change:
+            self.on_state_change(status)
 
-        # 3. Curfew Begins (11:00 PM)
-        if now >= t_curfew and not self._has_fired(current_session_date, "curfew"):
-            self._mark_fired(current_session_date, "curfew")
-            # Curfew begins: prompt dialog and schedule pending shutdown for 11:15 PM
-            # If user ignores dialog, shutdown still proceeds at 11:15 PM
-            self.state_mgr.accept_curfew(scheduled_shutdown_dt=t_shutdown, current_dt=now)
-            self.audit_logger.log(
-                "CURFEW_TRIGGERED",
-                "Curfew active: PC TIME IS OVER. Shutdown scheduled for grace period end.",
-                {"scheduled_shutdown": t_shutdown.isoformat()},
-                dt=now,
-            )
-            if self.on_curfew_start:
-                self.on_curfew_start()
-            if self.on_state_change:
-                self.on_state_change(CurfewStatus.SHUTDOWN_PENDING)
+    def _fire_warning(self, key: str, now: datetime) -> None:
+        status = CurfewStatus.WARNING_1 if key == "warning_1" else CurfewStatus.WARNING_2
+        self.state_mgr.set_status(status, now)
+        mins = self.config.minutes_between(key, "curfew")
+        self.audit_logger.log(status.value, f"{mins}-minute curfew warning dispatched.", dt=now)
+        callback = self.on_warning_1 if key == "warning_1" else self.on_warning_2
+        if callback:
+            callback()
+        self._state_changed(status)
 
-        # 4. Grace reminder 1 (11:05 PM)
-        if now >= t_r1 and not self._has_fired(current_session_date, "reminder_1"):
-            self._mark_fired(current_session_date, "reminder_1")
-            if self.state_mgr.get_status() == CurfewStatus.SHUTDOWN_PENDING:
-                self.audit_logger.log("SHUTDOWN_REMINDER_1", "10 minutes until shutdown.", dt=now)
-                if self.on_grace_reminder_1:
-                    self.on_grace_reminder_1()
+    def _fire_curfew(self, now: datetime, times: Dict[str, datetime]) -> None:
+        # Ignoring the dialog does not cancel the shutdown; the countdown starts right away.
+        self.state_mgr.accept_curfew(scheduled_shutdown_dt=times["shutdown"], current_dt=now)
+        self.audit_logger.log(
+            "CURFEW_TRIGGERED",
+            "Curfew active: PC TIME IS OVER. Shutdown scheduled for grace period end.",
+            {"scheduled_shutdown": times["shutdown"].isoformat()},
+            dt=now,
+        )
+        if self.on_curfew_start:
+            self.on_curfew_start()
+        self._state_changed(CurfewStatus.SHUTDOWN_PENDING)
 
-        # 5. Grace reminder 2 (11:10 PM)
-        if now >= t_r2 and not self._has_fired(current_session_date, "reminder_2"):
-            self._mark_fired(current_session_date, "reminder_2")
-            if self.state_mgr.get_status() == CurfewStatus.SHUTDOWN_PENDING:
-                self.audit_logger.log("SHUTDOWN_REMINDER_2", "5 minutes until shutdown.", dt=now)
-                if self.on_grace_reminder_2:
-                    self.on_grace_reminder_2()
-
-        # 6. Final warning (11:14 PM)
-        if now >= t_final and not self._has_fired(current_session_date, "final_warning"):
-            self._mark_fired(current_session_date, "final_warning")
-            if self.state_mgr.get_status() == CurfewStatus.SHUTDOWN_PENDING:
-                self.audit_logger.log("FINAL_WARNING", "1 minute until shutdown.", dt=now)
-                if self.on_final_warning:
-                    self.on_final_warning()
-
-        # 7. Shutdown Execution (11:15 PM)
-        if now >= t_shutdown and not self._has_fired(current_session_date, "shutdown"):
-            self._mark_fired(current_session_date, "shutdown")
-            if self.state_mgr.get_status() == CurfewStatus.SHUTDOWN_PENDING:
-                self._trigger_shutdown(now)
+    def _fire_reminder(self, key: str, now: datetime, times: Dict[str, datetime]) -> None:
+        mins = max(1, round((times["shutdown"] - times[key]).total_seconds() / 60))
+        event = {"reminder_1": "SHUTDOWN_REMINDER_1", "reminder_2": "SHUTDOWN_REMINDER_2", "final_warning": "FINAL_WARNING"}[key]
+        self.audit_logger.log(event, f"{mins} minute(s) until shutdown.", dt=now)
+        callback = {
+            "reminder_1": self.on_grace_reminder_1,
+            "reminder_2": self.on_grace_reminder_2,
+            "final_warning": self.on_final_warning,
+        }[key]
+        if callback:
+            callback()
 
     def _trigger_shutdown(self, now: datetime) -> None:
-        """Executes the scheduled shutdown."""
         self.state_mgr.mark_shutdown_initiated(now)
         self.audit_logger.log("SHUTDOWN_INITIATED", "Curfew grace period expired. Dispatching shutdown.", dt=now)
 
@@ -173,58 +215,39 @@ class Scheduler:
             self.audit_logger.log("SHUTDOWN_COMPLETED", f"Shutdown successful: {msg}", dt=now)
             if self.on_shutdown_executed:
                 self.on_shutdown_executed(True, msg)
-            if self.on_state_change:
-                self.on_state_change(CurfewStatus.SHUTDOWN_COMPLETED)
+            self._state_changed(CurfewStatus.SHUTDOWN_COMPLETED)
         else:
             self.state_mgr.mark_shutdown_failed(now)
             self.audit_logger.log("SHUTDOWN_FAILED", f"Shutdown failed: {msg}", dt=now)
             if self.on_shutdown_executed:
                 self.on_shutdown_executed(False, msg)
-            if self.on_state_change:
-                self.on_state_change(CurfewStatus.SHUTDOWN_FAILED)
+            self._state_changed(CurfewStatus.SHUTDOWN_FAILED)
+
+    # --- User actions --------------------------------------------------------------------
 
     def user_accepts_curfew(self) -> None:
-        """User clicks 'NO EMERGENCY' on the curfew dialog."""
+        """User clicked 'NO EMERGENCY'. The countdown is already running; just record it."""
         now = self.time_provider.now()
-        w1_time = self.config.get_time_obj("warning_1_time")
-        session_date = StateManager.get_session_date_for_time(now, w1_time)
-        t_shutdown = self.get_session_datetime(session_date, self.config.get_time_obj("shutdown_time"))
-
-        self.state_mgr.accept_curfew(scheduled_shutdown_dt=t_shutdown, current_dt=now)
         self.audit_logger.log("CURFEW_ACCEPTED", "User confirmed NO EMERGENCY. Countdown running.", dt=now)
-        if self.on_state_change:
-            self.on_state_change(CurfewStatus.SHUTDOWN_PENDING)
 
     def user_declares_emergency(self, reason: str) -> None:
-        """User confirms an emergency exception."""
         now = self.time_provider.now()
         self.state_mgr.grant_emergency(reason=reason, current_dt=now)
         self.audit_logger.log("EMERGENCY_GRANTED", f"Emergency exception granted: {reason}", {"reason": reason}, dt=now)
-
-        # Cancel any scheduled shutdown
         self.shutdown_mgr.cancel_shutdown()
-
-        if self.on_state_change:
-            self.on_state_change(CurfewStatus.EMERGENCY_EXCEPTION)
+        self._state_changed(CurfewStatus.EMERGENCY_EXCEPTION)
 
     def cancel_pending_shutdown(self, reason: str = "User manual abort") -> bool:
-        """Manually cancels a pending shutdown before the deadline."""
         now = self.time_provider.now()
         success, msg = self.shutdown_mgr.cancel_shutdown()
         self.state_mgr.cancel_pending_shutdown(current_dt=now)
         self.audit_logger.log("SHUTDOWN_CANCELLED", f"Pending shutdown cancelled: {reason} ({msg})", {"reason": reason}, dt=now)
-        if self.on_state_change:
-            self.on_state_change(CurfewStatus.SHUTDOWN_CANCELLED)
+        self._state_changed(CurfewStatus.SHUTDOWN_CANCELLED)
         return success
 
     def rearm_curfew(self) -> None:
-        """Resets the state back to NORMAL and clears fired events, re-arming curfew for tonight."""
+        """Resets tonight's session so the schedule applies again."""
         now = self.time_provider.now()
-        w1_time = self.config.get_time_obj("warning_1_time")
-        session_date = StateManager.get_session_date_for_time(now, w1_time)
-        self.state_mgr.reset_to_normal(now, w1_time)
-        if session_date in self._fired_events:
-            self._fired_events[session_date].clear()
+        self.state_mgr.reset_to_normal(now, self.config.get_time_obj("warning_1_time"))
         self.audit_logger.log("CURFEW_REARMED", "Curfew manually re-armed. State reset to NORMAL.", dt=now)
-        if self.on_state_change:
-            self.on_state_change(CurfewStatus.NORMAL)
+        self._state_changed(CurfewStatus.NORMAL)

@@ -24,7 +24,7 @@ def get_default_command() -> str:
     """Returns the command to start OFFLINE 11 at user login."""
     # Check if frozen executable (PyInstaller)
     if getattr(sys, "frozen", False):
-        return f'"{sys.executable}"'
+        return f'"{sys.executable}" --minimized'
 
     # Otherwise Python script invocation
     # Use pythonw.exe if available to avoid opening a terminal window
@@ -35,7 +35,7 @@ def get_default_command() -> str:
             python_exe = str(pythonw_candidate)
 
     main_script = Path(__file__).parent / "main.py"
-    return f'"{python_exe}" "{main_script.resolve()}"'
+    return f'"{python_exe}" "{main_script.resolve()}" --minimized'
 
 
 def is_autostart_enabled() -> bool:
