@@ -1,5 +1,5 @@
 """
-System tray icon and menu for OFFLINE 11 using pystray.
+System tray icon and menu for ShutCap using pystray.
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from PIL import Image
 import pystray
 from pystray import Menu, MenuItem
 
-from offline11.config import ConfigManager
-from offline11.state import StateManager
+from shutcap.config import ConfigManager
+from shutcap.state import StateManager
 
 
 class SystemTray:
@@ -55,23 +55,23 @@ class SystemTray:
             return f"Curfew: {self.config_mgr.config.curfew_time}"
 
         menu = Menu(
-            MenuItem("Open OFFLINE 11", lambda: self.on_show_window(), default=True),
+            MenuItem("Open ShutCap", lambda: self.on_show_window(), default=True),
             MenuItem(_get_status_text, None, enabled=False),
             MenuItem(_get_curfew_text, None, enabled=False),
             Menu.SEPARATOR,
             MenuItem("Settings...", lambda: self.on_open_settings()),
             MenuItem("Audit Log...", lambda: self.on_open_audit()),
             Menu.SEPARATOR,
-            MenuItem("Exit OFFLINE 11", lambda: self.on_exit_app()),
+            MenuItem("Exit ShutCap", lambda: self.on_exit_app()),
         )
         return menu
 
     def start(self) -> None:
         """Starts the system tray icon in a dedicated daemon thread."""
         self._icon = pystray.Icon(
-            name="OFFLINE11",
+            name="ShutCap",
             icon=self._image,
-            title="OFFLINE 11 — Strict PC Curfew",
+            title="ShutCap",
             menu=self._create_menu(),
         )
 

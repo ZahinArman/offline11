@@ -1,5 +1,5 @@
 """
-Emergency declaration dialog for OFFLINE 11.
+Emergency declaration dialog for ShutCap.
 Requires explicit reason and confirmation before granting a 1-night curfew exception.
 """
 
@@ -9,7 +9,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Optional
 
-from offline11.ui.theme import (
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_DARK,
@@ -34,7 +34,7 @@ class EmergencyDialog(tk.Toplevel):
     def __init__(self, parent: tk.Tk, on_confirm: Callable[[str], None]) -> None:
         super().__init__(parent)
         self.on_confirm = on_confirm
-        self.title("GENUINE EMERGENCY DECLARATION — OFFLINE 11")
+        self.title("GENUINE EMERGENCY DECLARATION — ShutCap")
         self.configure(bg=BG_DARK)
         self.geometry("520x420")
         self.resizable(False, False)

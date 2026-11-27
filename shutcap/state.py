@@ -15,7 +15,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from offline11.config import get_default_data_dir
+from shutcap.config import get_default_data_dir
 
 
 class CurfewStatus(str, Enum):

@@ -1,5 +1,5 @@
 """
-Curfew Dialog for OFFLINE 11.
+Curfew Dialog for ShutCap.
 Prominent, always-visible dialog displayed at 11:00 PM asking:
 "PC TIME IS OVER. Is there a genuine emergency?"
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Callable, Optional
 
-from offline11.ui.theme import (
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_CRITICAL,
@@ -46,7 +46,7 @@ class CurfewDialog(tk.Toplevel):
         self.info_text = info_text
         self.is_preview = is_preview
 
-        self.title("OFFLINE 11 — PREVIEW" if is_preview else "OFFLINE 11 — PC TIME IS OVER")
+        self.title("ShutCap — PREVIEW" if is_preview else "ShutCap — PC TIME IS OVER")
         self.configure(bg=BG_DARK)
         self.geometry("560x360")
         self.resizable(False, False)

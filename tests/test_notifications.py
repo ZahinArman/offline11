@@ -1,5 +1,5 @@
 """
-Unit tests for OFFLINE 11 Notifications module.
+Unit tests for ShutCap Notifications module.
 Verifies Windows toast fallback, audio dispatch, and ntfy push notification threading.
 """
 
@@ -8,8 +8,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from offline11.config import Config
-from offline11.notifications import NotificationManager
+from shutcap.config import Config
+from shutcap.notifications import NotificationManager
 
 
 class TestNotificationManager(unittest.TestCase):

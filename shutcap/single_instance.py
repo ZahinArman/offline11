@@ -1,5 +1,5 @@
 """
-Single-instance enforcement for OFFLINE 11.
+Single-instance enforcement for ShutCap.
 Uses Windows Win32 Mutex to reliably prevent duplicate processes.
 """
 
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from offline11.config import get_default_data_dir
+from shutcap.config import get_default_data_dir
 
 # Win32 Error Codes
 ERROR_ALREADY_EXISTS = 183
@@ -21,11 +21,11 @@ ERROR_ALREADY_EXISTS = 183
 
 class SingleInstance:
     """
-    Guarantees only one instance of OFFLINE 11 runs at a time.
+    Guarantees only one instance of ShutCap runs at a time.
     Uses a named Win32 Mutex on Windows, falling back to a PID lock file.
     """
 
-    def __init__(self, mutex_name: str = "Local\\OFFLINE11_App_SingleInstance_Mutex") -> None:
+    def __init__(self, mutex_name: str = "Local\\ShutCap_App_SingleInstance_Mutex") -> None:
         self.mutex_name = mutex_name
         self.mutex_handle = None
         self.lock_file: Path = get_default_data_dir() / "app.pid"
@@ -48,7 +48,7 @@ class SingleInstance:
 
             if last_error == ERROR_ALREADY_EXISTS:
                 self._is_already_running = True
-                logging.warning("Another instance of OFFLINE 11 is already running (Mutex exists).")
+                logging.warning("Another instance of ShutCap is already running (Mutex exists).")
                 kernel32.CloseHandle(self.mutex_handle)
                 self.mutex_handle = None
                 return False

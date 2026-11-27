@@ -1,4 +1,4 @@
-# OFFLINE 11 Requirements
+# ShutCap Requirements
 pillow>=10.0.0
 pystray>=0.19.5
 windows-toasts>=1.3.1

@@ -1,15 +1,15 @@
 """
-Windows installer for OFFLINE 11 (built into a single self-contained OFFLINE11-Setup.exe).
+Windows installer for ShutCap (built into a single self-contained ShutCap-Setup.exe).
 
 One confirmation, then:
-- installs to %LOCALAPPDATA%\\Programs\\OFFLINE 11 (per-user, no admin rights needed)
-- creates Start Menu + Desktop shortcuts and an "Uninstall OFFLINE 11" Start Menu entry
+- installs to %LOCALAPPDATA%\\Programs\\ShutCap (per-user, no admin rights needed)
+- creates Start Menu + Desktop shortcuts and an "Uninstall ShutCap" Start Menu entry
 - registers in Windows Settings > Apps > Installed apps
-- starts OFFLINE 11 automatically at login (can be turned off in Settings)
+- starts ShutCap automatically at login (can be turned off in Settings)
 - launches the app
 
 Re-running the setup upgrades/repairs an existing installation in place.
-Your settings and history in %LOCALAPPDATA%\\OFFLINE11 are kept across upgrades.
+Your settings and history in %LOCALAPPDATA%\\ShutCap are kept across upgrades.
 """
 
 from __future__ import annotations
@@ -27,12 +27,12 @@ from pathlib import Path
 from tkinter import messagebox
 from typing import Optional
 
-APP_NAME = "OFFLINE 11"
-APP_EXE = "OFFLINE11.exe"
-APP_DESCRIPTION = "Strict PC Curfew Utility for Windows"
-PUBLISHER = "OFFLINE 11"
-VERSION = "1.1.0"
-UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\OFFLINE11"
+APP_NAME = "ShutCap"
+APP_EXE = "ShutCap.exe"
+APP_DESCRIPTION = "Turns your PC off at the time you choose"
+PUBLISHER = "ShutCap"
+VERSION = "2.0.0"
+UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\ShutCap"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 SILENT = "--silent" in sys.argv
@@ -98,8 +98,8 @@ def find_payload() -> tuple[Optional[Path], Optional[Path], Optional[Path]]:
 
     app_dir = uninstaller = icon = None
     for base in bases:
-        if app_dir is None and (base / "OFFLINE11" / APP_EXE).exists():
-            app_dir = base / "OFFLINE11"
+        if app_dir is None and (base / "ShutCap" / APP_EXE).exists():
+            app_dir = base / "ShutCap"
         if uninstaller is None and (base / "uninstall.exe").exists():
             uninstaller = base / "uninstall.exe"
         for candidate in (base / "icon.ico", base / "assets" / "icon.ico"):
@@ -208,8 +208,8 @@ def install() -> None:
     if app_dir is None:
         show_message(
             "Installation Error",
-            "The OFFLINE 11 program files were not found inside this setup.\n"
-            "Please download OFFLINE11-Setup.exe again from the Releases page.",
+            "The ShutCap program files were not found inside this setup.\n"
+            "Please download ShutCap-Setup.exe again from the Releases page.",
             is_error=True,
         )
         sys.exit(1)

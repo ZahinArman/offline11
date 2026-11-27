@@ -1,5 +1,5 @@
 """
-Logging and audit module for OFFLINE 11.
+Logging and audit module for ShutCap.
 Records all warnings, decisions, emergency exceptions, shutdowns, and failures
 with local timestamps for transparency and accountability.
 """
@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from offline11.config import get_default_data_dir
+from shutcap.config import get_default_data_dir
 
 
 @dataclass

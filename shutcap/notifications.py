@@ -1,5 +1,5 @@
 """
-Notification manager for OFFLINE 11.
+Notification manager for ShutCap.
 Supports native Windows 10/11 Action Center toasts, audio alerts,
 and optional Android push notifications via ntfy.sh.
 """
@@ -23,7 +23,7 @@ try:
 except Exception:
     HAS_WINDOWS_TOASTS = False
 
-from offline11.config import Config
+from shutcap.config import Config
 
 
 class NotificationManager:
@@ -34,7 +34,7 @@ class NotificationManager:
         self._toaster = None
         if HAS_WINDOWS_TOASTS:
             try:
-                self._toaster = WindowsToaster("OFFLINE 11")
+                self._toaster = WindowsToaster("ShutCap")
             except Exception as e:
                 logging.warning(f"Failed to initialize WindowsToaster: {e}")
 
@@ -93,7 +93,7 @@ class NotificationManager:
         $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
         $xml.LoadXml($template)
         $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
-        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("OFFLINE 11").Show($toast)
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("ShutCap").Show($toast)
         """
         try:
             result = subprocess.run(

@@ -1,5 +1,5 @@
 """
-Test runner for OFFLINE 11.
+Test runner for ShutCap.
 Executes all unit and integration tests.
 """
 

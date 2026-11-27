@@ -1,5 +1,5 @@
 """
-Main entry point for OFFLINE 11.
+Main entry point for ShutCap.
 Wires together configuration, state persistence, single-instance mutex,
 notification dispatch, scheduling engine, UI dashboard, and system tray.
 """
@@ -20,23 +20,24 @@ project_root = str(Path(__file__).resolve().parent.parent)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from offline11 import __app_name__, __version__
-from offline11.config import Config, ConfigManager
-from offline11.logger import AuditLogger, setup_app_logging
-from offline11.notifications import NotificationManager
-from offline11.scheduler import Scheduler
-from offline11.shutdown import ShutdownManager
-from offline11.single_instance import SingleInstance
-from offline11.state import CurfewStatus, StateManager
-from offline11.time_provider import RealTimeProvider, TimeProvider, VirtualTimeProvider
-from offline11.ui.main_window import MainWindow
-from offline11.ui.tray import SystemTray
+from shutcap import __app_name__, __version__
+from shutcap.config import Config, ConfigManager
+from shutcap.logger import AuditLogger, setup_app_logging
+from shutcap.notifications import NotificationManager
+from shutcap.scheduler import Scheduler
+from shutcap.shutdown import ShutdownManager
+from shutcap.single_instance import SingleInstance
+from shutcap.state import CurfewStatus, StateManager
+from shutcap.time_provider import RealTimeProvider, TimeProvider, VirtualTimeProvider
+from shutcap.ui.main_window import MainWindow
+from shutcap.ui.setup_wizard import SetupWizard
+from shutcap.ui.tray import SystemTray
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="OFFLINE 11",
-        description="A Strict PC Curfew Utility for Windows.",
+        prog="ShutCap",
+        description="Turns your Windows PC off once per night, at the time you choose.",
     )
     parser.add_argument(
         "--dry-run",
@@ -111,7 +112,7 @@ def main() -> None:
                 from tkinter import messagebox
                 messagebox.showwarning(
                     "Already Running",
-                    "OFFLINE 11 is already running in the background.\n"
+                    "ShutCap is already running in the background.\n"
                     "Check the system tray icon near your taskbar clock.",
                 )
                 root.destroy()
@@ -142,7 +143,7 @@ def main() -> None:
         # 5. Core Services
         # Simulated clocks use a throwaway state/audit folder so they can never affect the real night.
         if simulated:
-            sim_dir = Path(tempfile.mkdtemp(prefix="offline11_sim_"))
+            sim_dir = Path(tempfile.mkdtemp(prefix="shutcap_sim_"))
             audit_logger = AuditLogger(log_path=sim_dir / "audit.log")
             state_mgr = StateManager(state_file=sim_dir / "state.json")
         else:
@@ -154,7 +155,7 @@ def main() -> None:
         # Log startup
         audit_logger.log(
             "STARTUP",
-            f"OFFLINE 11 v{__version__} started.",
+            f"ShutCap v{__version__} started.",
             {"dry_run": config_mgr.config.dry_run, "curfew": config_mgr.config.curfew_time},
             dt=time_provider.now(),
         )
@@ -189,7 +190,7 @@ def main() -> None:
             main_window.after(0, lambda: (main_window.show_from_tray(), main_window._open_audit()))
 
         def _exit_app() -> None:
-            audit_logger.log("APP_EXIT", "OFFLINE 11 was exited from the tray menu.", dt=time_provider.now())
+            audit_logger.log("APP_EXIT", "ShutCap was exited from the tray menu.", dt=time_provider.now())
             main_window.after(0, main_window.destroy)
 
         tray = SystemTray(
@@ -205,10 +206,6 @@ def main() -> None:
         # Connect window hide callback to tray
         main_window.on_hide_to_tray = lambda: None
 
-        # Start minimized if requested
-        if args.minimized:
-            main_window.withdraw()
-
         # 9. Main Periodic Tick Loop (runs every 1000ms)
         def _tick_loop() -> None:
             try:
@@ -219,14 +216,26 @@ def main() -> None:
             finally:
                 main_window.after(1000, _tick_loop)
 
-        # Schedule initial tick
-        main_window.after(200, _tick_loop)
+        if not config_mgr.config.setup_complete and not simulated:
+            # First run: ask for the shutdown time before anything is scheduled.
+            main_window.withdraw()
+
+            def _setup_done(new_config: Config) -> None:
+                main_window._on_settings_saved(new_config)
+                main_window.show_from_tray()
+                main_window.after(200, _tick_loop)
+
+            SetupWizard(main_window, config_mgr, on_done=_setup_done)
+        else:
+            if args.minimized:
+                main_window.withdraw()
+            main_window.after(200, _tick_loop)
 
         # Start GUI main loop
         main_window.mainloop()
 
     finally:
-        logging.info("OFFLINE 11 shutting down cleanly.")
+        logging.info("ShutCap shutting down cleanly.")
         if "tray" in locals():
             tray.stop()
         single_instance.release()

@@ -1,5 +1,5 @@
 """
-Unit tests for OFFLINE 11 Windows Shutdown Manager.
+Unit tests for ShutCap Windows Shutdown Manager.
 Verifies dry-run safety, command generation, and cancellation.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from offline11.shutdown import NO_WINDOW, ShutdownManager
+from shutcap.shutdown import NO_WINDOW, ShutdownManager
 
 
 class TestShutdownManager(unittest.TestCase):
@@ -35,10 +35,10 @@ class TestShutdownManager(unittest.TestCase):
         mgr = ShutdownManager(dry_run=False)
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-            success, msg = mgr.execute_shutdown(comment="OFFLINE 11: Curfew shutdown", grace_seconds=60)
+            success, msg = mgr.execute_shutdown(comment="ShutCap: Curfew shutdown", grace_seconds=60)
             self.assertTrue(success)
             mock_run.assert_called_once_with(
-                ["shutdown.exe", "/s", "/t", "60", "/c", "OFFLINE 11: Curfew shutdown"],
+                ["shutdown.exe", "/s", "/t", "60", "/c", "ShutCap: Curfew shutdown"],
                 capture_output=True,
                 text=True,
                 check=False,

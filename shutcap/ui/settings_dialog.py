@@ -1,5 +1,5 @@
 """
-Settings Dialog for OFFLINE 11.
+Settings Dialog for ShutCap.
 Allows configuring schedule milestones, dry-run mode, autostart, and push notifications.
 """
 
@@ -9,9 +9,9 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
-from offline11.autostart import disable_autostart, enable_autostart, is_autostart_enabled
-from offline11.config import Config, ConfigManager
-from offline11.ui.theme import (
+from shutcap.autostart import disable_autostart, enable_autostart, is_autostart_enabled
+from shutcap.config import Config, ConfigManager
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_DARK,
@@ -46,7 +46,7 @@ class SettingsDialog(tk.Toplevel):
         self.on_save_callback = on_save_callback
         self.on_test_warning = on_test_warning
 
-        self.title("SETTINGS — OFFLINE 11")
+        self.title("SETTINGS — ShutCap")
         self.configure(bg=BG_DARK)
         self.geometry("540x580")
         self.resizable(False, False)
@@ -147,7 +147,7 @@ class SettingsDialog(tk.Toplevel):
         self.dry_run_var = tk.BooleanVar()
         self.dry_run_check = tk.Checkbutton(
             opt_frame,
-            text="Dry-Run Mode (Simulate shutdowns safely without turning off PC)",
+            text="Dry-run (practice) mode: show warnings but do not turn the PC off",
             variable=self.dry_run_var,
             bg=BG_DARK,
             fg=TEXT_PRIMARY,
@@ -162,7 +162,7 @@ class SettingsDialog(tk.Toplevel):
         self.autostart_var = tk.BooleanVar()
         self.autostart_check = tk.Checkbutton(
             opt_frame,
-            text="Start OFFLINE 11 automatically when Windows boots",
+            text="Start ShutCap automatically when Windows boots",
             variable=self.autostart_var,
             bg=BG_DARK,
             fg=TEXT_PRIMARY,
@@ -305,7 +305,7 @@ class SettingsDialog(tk.Toplevel):
             warn = messagebox.askyesno(
                 "Warning: Live Shutdown Enforcement",
                 "You are disabling Dry-Run mode.\n\n"
-                "OFFLINE 11 will now issue REAL shutdown commands at curfew.\n"
+                "ShutCap will now issue REAL shutdown commands at curfew.\n"
                 "Are you sure you want to proceed with live enforcement?",
                 parent=self,
             )

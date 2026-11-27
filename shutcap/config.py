@@ -1,5 +1,5 @@
 """
-Configuration module for OFFLINE 11.
+Configuration module for ShutCap.
 Handles persistent settings, default times, validation, and serialization.
 """
 
@@ -14,12 +14,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 def get_default_data_dir() -> Path:
-    """Returns the application data directory in %LOCALAPPDATA%\\OFFLINE11."""
+    """Returns the application data directory in %LOCALAPPDATA%\\ShutCap."""
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
-        path = Path(local_app_data) / "OFFLINE11"
+        path = Path(local_app_data) / "ShutCap"
     else:
-        path = Path.home() / ".offline11"
+        path = Path.home() / ".shutcap"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -35,6 +35,17 @@ MILESTONES: List[Tuple[str, str, str]] = [
     ("shutdown", "shutdown_time", "Shutdown"),
 ]
 MILESTONE_FIELDS: Dict[str, str] = {label: field for _, field, label in MILESTONES}
+
+# Default minutes before the shutdown time for each milestone (used by first-run setup).
+DEFAULT_MINUTES_BEFORE_SHUTDOWN: Dict[str, int] = {
+    "warning_1_time": 45,
+    "warning_2_time": 25,
+    "curfew_time": 15,
+    "grace_reminder_1_time": 10,
+    "grace_reminder_2_time": 5,
+    "final_warning_time": 1,
+    "shutdown_time": 0,
+}
 
 
 @dataclass
@@ -52,8 +63,20 @@ class Config:
     desktop_reminder_window: bool = True   # Pop up modal/dialog reminder
     autostart: bool = False                # Auto-start on Windows login
     ntfy_enabled: bool = False             # Send Android push notifications via ntfy
-    ntfy_topic: str = ""                   # ntfy topic name (e.g. offline11_my_secret_code)
+    ntfy_topic: str = ""                   # ntfy topic name (e.g. shutcap_my_secret_code)
     ntfy_server: str = "https://ntfy.sh"   # ntfy server URL
+    setup_complete: bool = False           # First-run setup finished
+
+    @staticmethod
+    def schedule_for_shutdown(shutdown_hhmm: str) -> Dict[str, str]:
+        """Default milestone times (HH:MM) for a chosen shutdown time; wraps around midnight."""
+        t = Config.parse_time_str(shutdown_hhmm)
+        base = t.hour * 60 + t.minute
+        result = {}
+        for field_name, before in DEFAULT_MINUTES_BEFORE_SHUTDOWN.items():
+            m = (base - before) % (24 * 60)
+            result[field_name] = f"{m // 60:02d}:{m % 60:02d}"
+        return result
 
     @classmethod
     def parse_time_str(cls, time_str: str) -> time:

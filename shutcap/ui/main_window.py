@@ -1,5 +1,5 @@
 """
-Main application dashboard for OFFLINE 11.
+Main application dashboard for ShutCap.
 Minimal dark monochrome interface displaying curfew state, schedule countdown,
 and controls for settings, audit log, and emergency cancellation.
 """
@@ -11,19 +11,19 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import Callable, Optional
 
-from offline11.config import Config, ConfigManager
-from offline11.logger import AuditLogger
-from offline11.scheduler import Scheduler
-from offline11.state import CurfewStatus, StateManager
-from offline11.time_provider import TimeProvider
-from offline11.notifications import NotificationManager
-from offline11.ui.audit_dialog import AuditDialog
-from offline11.ui.curfew_dialog import CurfewDialog
-from offline11.ui.countdown_widget import CountdownWidget
-from offline11.ui.emergency_dialog import EmergencyDialog
-from offline11.ui.settings_dialog import SettingsDialog
-from offline11.ui.warning_dialog import WarningDialog
-from offline11.ui.theme import (
+from shutcap.config import Config, ConfigManager
+from shutcap.logger import AuditLogger
+from shutcap.scheduler import Scheduler
+from shutcap.state import CurfewStatus, StateManager
+from shutcap.time_provider import TimeProvider
+from shutcap.notifications import NotificationManager
+from shutcap.ui.audit_dialog import AuditDialog
+from shutcap.ui.curfew_dialog import CurfewDialog
+from shutcap.ui.countdown_widget import CountdownWidget
+from shutcap.ui.emergency_dialog import EmergencyDialog
+from shutcap.ui.settings_dialog import SettingsDialog
+from shutcap.ui.warning_dialog import WarningDialog
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_CRITICAL,
@@ -48,7 +48,7 @@ from offline11.ui.theme import (
 
 
 class MainWindow(tk.Tk):
-    """Main window dashboard for OFFLINE 11."""
+    """Main window dashboard for ShutCap."""
 
     def __init__(
         self,
@@ -69,7 +69,7 @@ class MainWindow(tk.Tk):
         self.notifications = notifications
         self.on_hide_to_tray = on_hide_to_tray
 
-        self.title("OFFLINE 11 — Strict PC Curfew")
+        self.title("ShutCap")
         self.configure(bg=BG_DARK)
         self.geometry("520x560")
         self.minsize(480, 520)
@@ -119,7 +119,7 @@ class MainWindow(tk.Tk):
 
         app_title = tk.Label(
             title_box,
-            text="OFFLINE 11",
+            text="ShutCap",
             font=FONT_TITLE,
             fg=TEXT_PRIMARY,
             bg=BG_DARK,
@@ -128,7 +128,7 @@ class MainWindow(tk.Tk):
 
         app_sub = tk.Label(
             title_box,
-            text="STRICT PC CURFEW UTILITY",
+            text="YOUR PC SHUTS DOWN ON TIME",
             font=FONT_CAPTION,
             fg=TEXT_SECONDARY,
             bg=BG_DARK,
@@ -383,7 +383,7 @@ class MainWindow(tk.Tk):
         """Triggers a sample warning popup, sound alert, and notification for testing."""
         if self.notifications:
             self.notifications.notify(
-                title="OFFLINE 11: 30-Minute Warning (Test)",
+                title="ShutCap: 30-Minute Warning (Test)",
                 message="Sample 30-minute curfew warning. Finish what you are doing and start winding down.",
                 sound_type="warning",
             )
@@ -521,7 +521,7 @@ class MainWindow(tk.Tk):
         mins = cfg.minutes_between("warning_1", "curfew")
         if self.notifications:
             self.notifications.notify(
-                title=f"OFFLINE 11: {mins}-Minute Warning",
+                title=f"ShutCap: {mins}-Minute Warning",
                 message=f"{self._plural_minutes(mins)} until PC curfew. Finish what you're doing and start winding down.",
                 sound_type="warning",
                 push_priority="default",
@@ -540,7 +540,7 @@ class MainWindow(tk.Tk):
         mins = cfg.minutes_between("warning_2", "curfew")
         if self.notifications:
             self.notifications.notify(
-                title=f"OFFLINE 11: {mins}-Minute Warning",
+                title=f"ShutCap: {mins}-Minute Warning",
                 message=f"{self._plural_minutes(mins)} until PC curfew. Save your work and close everything.",
                 sound_type="urgent",
                 push_priority="high",
@@ -563,7 +563,7 @@ class MainWindow(tk.Tk):
                 pass
         if self.notifications:
             self.notifications.notify(
-                title="OFFLINE 11: PC Curfew Active",
+                title="ShutCap: PC Curfew Active",
                 message="PC TIME IS OVER. Is there a genuine emergency?",
                 sound_type="urgent",
                 long_duration=True,
@@ -577,7 +577,7 @@ class MainWindow(tk.Tk):
         mins_txt = self._plural_minutes(cfg.minutes_between(key, "shutdown"))
         if self.notifications:
             self.notifications.notify(
-                title=f"OFFLINE 11: {mins_txt} Until Shutdown",
+                title=f"ShutCap: {mins_txt} Until Shutdown",
                 message=f"{mins_txt} until PC shutdown (at {cfg.shutdown_time}). Save your work and close your applications.",
                 sound_type=sound,
                 push_priority=push_priority,
@@ -611,7 +611,7 @@ class MainWindow(tk.Tk):
         if self.notifications:
             if success:
                 self.notifications.notify(
-                    title="OFFLINE 11: System Shutdown Initiated",
+                    title="ShutCap: System Shutdown Initiated",
                     message="Curfew shutdown command accepted by Windows.",
                     sound_type="urgent",
                     push_priority="max",
@@ -619,7 +619,7 @@ class MainWindow(tk.Tk):
                 )
             else:
                 self.notifications.notify(
-                    title="OFFLINE 11: SHUTDOWN FAILED",
+                    title="ShutCap: SHUTDOWN FAILED",
                     message=f"Windows shutdown was blocked or failed: {msg}",
                     sound_type="urgent",
                     push_priority="max",

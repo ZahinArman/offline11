@@ -1,5 +1,5 @@
 """
-Warning Popup Dialog for OFFLINE 11.
+Warning Popup Dialog for ShutCap.
 Prominent, topmost on-screen window displayed at warning milestones
 (30-minute warning, 10-minute warning, and grace period countdowns).
 Guarantees visual notice regardless of Windows notification center or Focus Assist settings.
@@ -10,7 +10,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Callable, Optional
 
-from offline11.ui.theme import (
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_CRITICAL,
@@ -51,7 +51,7 @@ class WarningDialog(tk.Toplevel):
         self.remaining_seconds = auto_close_seconds
         self.on_open_dashboard = on_open_dashboard
 
-        self.title(f"OFFLINE 11 — {title}")
+        self.title(f"ShutCap — {title}")
         self.configure(bg=BG_DARK)
         self.geometry("480x250")
         self.resizable(False, False)

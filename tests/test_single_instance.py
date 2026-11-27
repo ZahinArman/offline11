@@ -1,18 +1,18 @@
 """
-Unit tests for OFFLINE 11 Single-Instance Enforcement.
+Unit tests for ShutCap Single-Instance Enforcement.
 Verifies duplicate processes are prevented.
 """
 
 from __future__ import annotations
 
 import unittest
-from offline11.single_instance import SingleInstance
+from shutcap.single_instance import SingleInstance
 
 
 class TestSingleInstance(unittest.TestCase):
     def test_single_instance_acquisition_and_duplicate_rejection(self) -> None:
         """Verifies that only one instance can acquire the named mutex."""
-        mutex_name = "Local\\OFFLINE11_Test_Mutex_123"
+        mutex_name = "Local\\ShutCap_Test_Mutex_123"
         inst1 = SingleInstance(mutex_name=mutex_name)
         acquired1 = inst1.check_or_acquire()
         self.assertTrue(acquired1)

@@ -1,5 +1,5 @@
 """
-Windows Shutdown Executor module for OFFLINE 11.
+Windows Shutdown Executor module for ShutCap.
 Manages documented Windows shutdown commands, safe cancellations,
 and dry-run safety modes.
 """
@@ -23,7 +23,7 @@ class ShutdownManager:
         self.dry_run = dry_run
         self.last_error: Optional[str] = None
 
-    def execute_shutdown(self, comment: str = "OFFLINE 11: Curfew shutdown initiated. Save your work.", grace_seconds: int = 60) -> Tuple[bool, str]:
+    def execute_shutdown(self, comment: str = "ShutCap: Curfew shutdown initiated. Save your work.", grace_seconds: int = 60) -> Tuple[bool, str]:
         """
         Initiates a standard Windows shutdown.
         Uses `shutdown.exe /s /t <seconds> /c "<comment>"`.

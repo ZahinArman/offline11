@@ -1,5 +1,5 @@
 """
-Audit trail viewer dialog for OFFLINE 11.
+Audit trail viewer dialog for ShutCap.
 Displays timestamps, curfew decisions, warnings, emergency exceptions, and shutdowns.
 """
 
@@ -9,8 +9,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import List
 
-from offline11.logger import AuditEntry, AuditLogger
-from offline11.ui.theme import (
+from shutcap.logger import AuditEntry, AuditLogger
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_DARK,
@@ -35,7 +35,7 @@ class AuditDialog(tk.Toplevel):
         super().__init__(parent)
         self.audit_logger = audit_logger
 
-        self.title("AUDIT LOG — OFFLINE 11")
+        self.title("AUDIT LOG — ShutCap")
         self.configure(bg=BG_DARK)
         self.geometry("740x500")
         self.minsize(600, 380)
@@ -187,7 +187,7 @@ class AuditDialog(tk.Toplevel):
     def _export_log(self) -> None:
         file_path = filedialog.asksaveasfilename(
             parent=self,
-            title="Export OFFLINE 11 Audit Log",
+            title="Export ShutCap Audit Log",
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("Log files", "*.log"), ("All files", "*.*")],
         )

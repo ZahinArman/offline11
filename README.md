@@ -1,346 +1,319 @@
-# OFFLINE 11: A Strict PC Curfew Utility for Windows
-
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat&logo=windows)](https://github.com/ZahinArman/offline11)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat&logo=python)](https://github.com/ZahinArman/offline11)
-[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-success)](https://github.com/ZahinArman/offline11)
-
-> **"No PC usage after 11:00 PM."**  
-> A lightweight, reliable, quiet Windows utility designed to enforce personal sleep discipline without casual bypasses, cloud accounts, or distracting productivity gamification.
-
----
-
-## 🎯 Purpose and Direction
-
-Modern screen-time and focus tools have a fundamental flaw: **they are too polite.** They pop up easily-dismissed notifications, rely on browser extensions that can be turned off in two clicks, or drown you in colorful productivity dashboards and gamified streak counters that keep you looking at the screen longer.
-
-**OFFLINE 11 is built on the opposite philosophy:**
-1. **Absolute Simplicity**: Single mission: power the computer off once per night, at the time *you* choose (11:15 PM by default).
-2. **Hard to Casually Bypass**: Prominent topmost modal prompts, persistent floating grace-period countdowns, and real Windows shutdown triggers.
-3. **Respect for Sleep & Autonomy**: Distinguishes between mindless procrastination (gaming, late-night browsing) and genuine emergencies (medical, critical server outages). Emergency exceptions require written rationale and accountability confirmation.
-4. **A Nudge, Never a Lockout**: The curfew is enforced at most once per night. If you turn the PC back on (or wake it from sleep) after curfew began, OFFLINE 11 assumes you had a good reason and leaves you alone, with no dialog, no countdown and no warning. The next cycle starts at the following evening's first warning.
-5. **No Telemetry, No Accounts, No Cloud**: 100% offline, local JSON state, zero tracking.
-
----
-
-## Table of Contents
-
-1. [Key Features & Design Philosophy](#key-features--design-philosophy)
-2. [Schedule & Enforcement Timeline](#schedule--enforcement-timeline)
-3. [The Core Rules: Once Per Night, Never a Lockout](#the-core-rules-once-per-night-never-a-lockout)
-4. [Architecture & Code Structure](#architecture--code-structure)
-5. [Install & Uninstall](#installation--setup)
-6. [Running the Application](#running-the-application)
-7. [Safe Testing Modes](#safe-testing-modes)
-8. [Windows Auto-Startup Setup](#windows-auto-startup-setup)
-9. [Optional Android Push Notifications (ntfy.sh)](#optional-android-push-notifications-ntfysh)
-10. [Safety & Emergency Recovery Procedure](#safety--emergency-recovery-procedure)
-11. [Building the Installer](#building-the-installer)
-12. [Automated Verification & Test Suite](#automated-verification--test-suite)
-13. [Documented Limitations & Technical Trade-offs](#documented-limitations--technical-trade-offs)
-
----
-
-## Key Features & Design Philosophy
-
-- **One-File Installer (`OFFLINE11-Setup.exe`)**: Download, double-click, confirm. No admin rights, no zip to extract. Adds Start Menu and Desktop shortcuts, starts at sign-in, and appears in Settings > Apps.
-- **Clean Uninstall**: Uninstall from Settings > Apps (or the Start Menu) and every trace is removed: program files, shortcuts, startup entry, settings and logs.
-- **Customizable Schedule**: While 11:00 PM is the default curfew, every milestone time (warnings, curfew, reminders, and shutdown) can be freely customized in **Settings** to match your personal sleep schedule.
-- **Self-Discipline Engine**: Built for self-restraint, not gamification. No badges, no leveling up, no analytics, no remote telemetry.
-- **Dark Monochrome Aesthetic**: Restrained, high-contrast system utility aesthetic (`#121212` charcoal black palette) with zero distracting animations.
-- **Topmost Curfew Enforcement**: At 11:00 PM, a prominent, always-visible modal appears requiring explicit confirmation. Ignoring the prompt never cancels curfew.
-- **15-Minute Grace Period**: Countdown with reminders at 11:05 PM, 11:10 PM, and 11:14 PM to ensure files are saved cleanly.
-- **Standard Windows Shutdown**: Uses native `shutdown.exe /s /t 60` with safe application closure warnings. Never uses `/f` (force-close) blindly.
-- **Dry-Run Mode by Default**: Safe testing mode enabled by default so you can test all workflows without turning off your PC.
-- **Single-Instance Mutex**: Native Win32 mutex prevents duplicate processes and duplicate timers.
-- **Persistent State File**: Atomic JSON state tracking survives unexpected crashes, reboots, and sleep cycles.
-- **Android Push Support**: Zero-overhead, privacy-first push notifications through [ntfy.sh](https://ntfy.sh).
-
----
-
-## Schedule & Enforcement Timeline
-
-> [!TIP]
-> **Need a different curfew time?**  
-> While the default schedule is set for an **11:00 PM curfew / 11:15 PM shutdown**, all times are completely customizable to fit your routine:
-> 1. Click **SETTINGS** in the OFFLINE 11 dashboard.
-> 2. Edit any milestone in standard 24-hour `HH:MM` format (e.g., set Curfew to `22:00` for 10:00 PM, or `00:00` for midnight; schedules may cross midnight).
-> 3. Click **SAVE SETTINGS**. The app validates that your milestones are in order and applies the new schedule immediately (no restart needed). Warning texts follow your schedule automatically.
-
-The default 24-hour schedule operates as follows:
-
-| Time | Milestone | Action Taken |
-| :--- | :--- | :--- |
-| **10:30 PM** | First Warning | Desktop toast + optional sound: *"30 minutes until PC curfew. Finish what you're doing and start winding down."* |
-| **10:50 PM** | Final Warning | Desktop toast + sound: *"10 minutes until PC curfew. Save your work and close everything."* |
-| **11:00 PM** | Curfew Begins | Prominent, topmost modal dialog: *"PC TIME IS OVER. Is there a genuine emergency?"* Options: `NO EMERGENCY` or `GENUINE EMERGENCY`. Grace countdown begins. |
-| **11:05 PM** | Grace Reminder 1 | Notification: *"10 minutes until PC shutdown. Save all open files."* |
-| **11:10 PM** | Grace Reminder 2 | Notification: *"5 minutes until PC shutdown. Close all open applications."* |
-| **11:14 PM** | Final Warning | Urgent toast & sound: *"1 minute until shutdown. Preparing system shutdown."* |
-| **11:15 PM** | Scheduled Shutdown | Initiates standard Windows shutdown (`shutdown.exe /s /t 60`). |
-
----
-
-## The Core Rules: Once Per Night, Never a Lockout
-
-OFFLINE 11 is a small hiccup that tells you to stop, not a jail. These rules are enforced by the scheduler and covered by `tests/test_no_lockout.py`:
-
-1. **Once per night.** A night's cycle (a "session") is keyed by the date of its First Warning. Once it is resolved (shutdown issued, emergency declared, countdown aborted, or skipped) nothing else happens until the next evening's First Warning.
-2. **Never locked out.** If the PC is turned on, restarted, or woken from sleep *after curfew began*, that night is skipped silently. This is detected with a small heartbeat in the state file (boot time alone is unreliable because of Windows Fast Startup). A quick app restart while the PC stays on simply resumes the countdown.
-3. **No stale popups.** Outside tonight's window nothing is shown. An unfinished night (e.g. you shut the PC down yourself during the grace period) is closed quietly, so there is no leftover countdown the next morning.
-4. **No alert replays.** Fired milestones are saved to disk, and if several are overdue at once (app started late) only the most recent one is shown.
-
-### Acceptance scenario
-1. At curfew time, the curfew dialog appears.
-2. User selects **NO EMERGENCY** (or ignores the dialog).
-3. At shutdown time, the computer shuts down.
-4. User turns it back on at **12:00 AM**: no dialog, no countdown, no warning.
-5. User uses the PC normally all day.
-6. The next evening, the cycle starts again at the First Warning.
-
----
-
-## Architecture & Code Structure
-
-The utility is structured cleanly into independent, modular components:
-
-```
-d:\11ofDeath\
-├── offline11/
-│   ├── __init__.py           # Package version and metadata
-│   ├── config.py             # Settings, defaults, JSON serialization & validation
-│   ├── state.py              # State machine, session reference tracking, atomic disk persistence
-│   ├── time_provider.py      # Real clock vs virtual clock (for accelerated simulation)
-│   ├── scheduler.py          # Daily timeline engine, deduplication, sleep/wake handling
-│   ├── shutdown.py           # Windows shutdown execution, cancellations, dry-run safety
-│   ├── notifications.py      # WinRT Action Center toasts, PowerShell fallback, audio chime, ntfy push
-│   ├── single_instance.py    # Win32 named Mutex lock & PID tracker
-│   ├── autostart.py          # Windows Registry auto-startup manager
-│   ├── logger.py             # Audit log and diagnostic application logs
-│   ├── main.py               # CLI parser and application entry point
-│   └── ui/
-│       ├── __init__.py
-│       ├── theme.py          # Dark monochrome palette and typography
-│       ├── main_window.py    # Dashboard (state badge, timer, manual abort, settings)
-│       ├── curfew_dialog.py  # 11:00 PM topmost modal dialog
-│       ├── emergency_dialog.py # Emergency declaration, reason input & explicit confirmation
-│       ├── countdown_widget.py # Floating persistent 11:00-11:15 PM countdown banner
-│       ├── settings_dialog.py# Settings editor
-│       ├── audit_dialog.py   # Audit log viewer and export tool
-│       └── tray.py           # System tray icon and context menu
-├── tests/
-│   ├── test_state.py         # State transitions, date rollover, reboot at 12:00 AM acceptance test
-│   ├── test_no_lockout.py    # Once-per-night, no-lockout, no-replay and midnight-crossing rules
-│   ├── test_scheduler.py     # Timeline milestones, deduplication, time jumps
-│   ├── test_shutdown.py      # Shutdown commands, dry-run, cancellation syntax
-│   ├── test_single_instance.py # Win32 Mutex duplicate prevention
-│   ├── test_notifications.py # Toast fallback, audio dispatch, push threading
-│   └── run_all_tests.py      # Comprehensive test suite runner
-├── assets/
-│   ├── icon.ico              # Windows application icon
-│   └── icon.png              # High-resolution application logo
-├── install.py                # Standalone Windows application installer script
-├── uninstall.py              # Standalone 1-click uninstaller script
-├── build_exe.bat             # Builds dist\OFFLINE11-Setup.exe with PyInstaller
-├── run_test_mode.bat         # Safe 60-second accelerated simulation launcher
-└── requirements.txt          # Python dependencies
-```
-
----
-
-## Installation & Setup
-
-### Install (recommended)
-
-1. Download **`OFFLINE11-Setup.exe`** from the [GitHub Releases](https://github.com/ZahinArman/offline11/releases) page.
-2. Double-click it and click **Yes**.
-
-That's it. OFFLINE 11 is installed for your Windows user (no admin rights needed), starts right away, and starts automatically every time you sign in. You'll find it in the Start Menu, on your Desktop, and as an icon near the clock.
-
-It starts in safe **Dry-Run** mode: everything works except the actual power-off. When you're happy with your schedule, untick Dry-Run in **Settings** to enable real shutdowns.
-
-To update, just run a newer `OFFLINE11-Setup.exe`. Your settings and history are kept.
-
-> Windows SmartScreen may warn about an unrecognized app because the installer isn't code-signed. Click **More info → Run anyway**.
-
-### Uninstall
-
-Use any of these:
-- **Settings > Apps > Installed apps** → **OFFLINE 11** → **Uninstall**
-- Start Menu → **Uninstall OFFLINE 11**
-
-After one confirmation, everything is removed:
-- Program files (`%LOCALAPPDATA%\Programs\OFFLINE 11`)
-- Start Menu, Desktop and pinned-taskbar shortcuts
-- The sign-in startup entry and the Installed apps entry
-- All settings, state and logs (`%LOCALAPPDATA%\OFFLINE11`)
-
----
-
-### Running from Source (Python 3.10+)
-
-```cmd
-git clone https://github.com/ZahinArman/offline11.git
-cd offline11
-pip install -r requirements.txt
-python offline11\main.py
-```
-
----
-
-## Running the Application
-
-### 1. Interactive Run (Default GUI Mode)
-```cmd
-python offline11\main.py
-```
-This opens the OFFLINE 11 dashboard and places an icon in the Windows system tray.
-
-### 2. Run in Safe Dry-Run Mode
-```cmd
-python offline11\main.py --dry-run
-```
-*(Shutdowns are simulated and logged to the audit log; Windows will not power off.)*
-
-### 3. Run in Live Enforcement Mode
-```cmd
-python offline11\main.py --live
-```
-*(Warning: issues real Windows shutdown commands when the curfew grace period expires.)*
-
-### 4. Run Minimized in Background (System Tray Only)
-```cmd
-python offline11\main.py --minimized
-```
-
----
-
-## Safe Testing Modes
-
-### 1. One-Click Safe 60-Second Demo
-Run the included batch script:
-```cmd
-run_test_mode.bat
-```
-Or via CLI:
-```cmd
-python offline11\main.py --test-mode --debug
-```
-This replays **your configured schedule** on a fast virtual clock, so the whole night (first warning to dry-run shutdown) takes about 60 seconds. Test mode always runs in dry-run and uses a throwaway state folder, so it can never affect tonight's real curfew.
-
-The **TEST CURFEW** button on the dashboard only previews the curfew dialog. It never schedules anything.
-
-### 2. Accelerated Virtual Clock
-Simulate hours passing in seconds using the `--accelerated` flag:
-```cmd
-python offline11\main.py --accelerated 60 --dry-run
-```
-*(At 60x speed, 1 real second = 1 virtual minute. Uses a throwaway state folder.)*
-
----
-
-## Windows Auto-Startup Setup
-
-To start OFFLINE 11 automatically whenever you log into Windows:
-
-### Method A: Via Application Settings GUI
-1. Open OFFLINE 11.
-2. Click **SETTINGS**.
-3. Check **"Start OFFLINE 11 automatically when Windows boots"**.
-4. Click **SAVE SETTINGS**.
-
-### Method B: Manual Windows Registry Entry
-OFFLINE 11 uses the standard Windows startup registry key:
-- **Registry Key**: `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
-- **Value Name**: `OFFLINE 11`
-- **Value Data**: `"C:\path\to\OFFLINE11.exe" --minimized` (or `"pythonw.exe" "C:\path\to\offline11\main.py" --minimized`)
-
----
-
-## Optional Android Push Notifications (ntfy.sh)
-
-If you want your phone to alert you alongside your PC:
-
-1. Install the free, open-source **ntfy** app from Google Play or F-Droid on your Android phone.
-2. Open the app and tap **Subscribe to topic**.
-3. Pick a private, unique topic name (e.g. `offline11_john_8391`).
-4. In OFFLINE 11, click **SETTINGS**:
-   - Check **Android Push**.
-   - Enter your topic name (`offline11_john_8391`).
-   - Click **SAVE SETTINGS**.
-5. Your phone will receive instant push notifications with alert sounds at:
-   - 10:30 PM (Warning 1)
-   - 10:50 PM (Final Warning)
-   - 11:00 PM (Curfew Alert)
-   - 11:15 PM (Shutdown Notice)
-   - Emergency Declarations
-
-*No accounts, passwords, or emails required.*
-
----
-
-## Safety & Emergency Recovery Procedure
-
-### 1. Documented Recovery Command
-If a shutdown has been scheduled and you must abort it from Windows command line or the Run prompt:
-1. Press `Win + R` on your keyboard.
-2. Type:
-   ```cmd
-   shutdown /a
+# ShutCap
+
+![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+ShutCap is a small Windows tray utility that turns the PC off once each night, at a time that you choose.
+
+ShutCap is a gentle nudge, not a lock. It never locks you out of your PC.
+
+## Contents
+
+- [How it works](#how-it-works)
+- [Install](#install)
+- [First-time setup](#first-time-setup)
+- [Daily use](#daily-use)
+- [The curfew](#the-curfew)
+- [Safety rules](#safety-rules)
+- [Settings](#settings)
+- [Notifications](#notifications)
+- [Uninstall](#uninstall)
+- [Run from source](#run-from-source)
+- [Test mode](#test-mode)
+- [Start at sign-in by hand](#start-at-sign-in-by-hand)
+- [Build the installer](#build-the-installer)
+- [Tests](#tests)
+- [Code layout](#code-layout)
+- [Limitations](#limitations)
+- [License](#license)
+
+## How it works
+
+1. You choose the time at which the PC turns off.
+2. ShutCap calculates the warning times from that time.
+3. ShutCap shows two warnings before the curfew starts.
+4. At the curfew, ShutCap shows a dialog and a countdown.
+5. At the turn-off time, ShutCap runs `shutdown.exe /s /t 60`.
+6. Windows gives your apps 60 seconds, then the PC turns off.
+
+ShutCap does not use `/f`. Windows does not force apps to close.
+
+ShutCap has no telemetry, no accounts, and no cloud service.
+
+## Install
+
+Requirements: Windows 10 or Windows 11. You do not need administrator rights.
+
+1. Open the [Releases](https://github.com/ZahinArman/shutcap/releases) page.
+2. Download `ShutCap-Setup.exe`.
+3. Double-click the file.
+4. Click **Yes**.
+
+The setup program does these tasks:
+
+- It installs ShutCap to `%LOCALAPPDATA%\Programs\ShutCap`.
+- It adds Start Menu and Desktop shortcuts.
+- It adds **Uninstall ShutCap** to the Start Menu.
+- It adds ShutCap to Settings > Apps > Installed apps.
+- It sets ShutCap to start at sign-in, minimized to the tray.
+- It starts ShutCap.
+
+To upgrade, run a newer setup file. The upgrade keeps your settings.
+
+> **NOTE:** The setup file is not code-signed. Windows SmartScreen can show a warning. Click **More info**, then click **Run anyway**.
+
+## First-time setup
+
+On the first start, ShutCap shows a setup window with two steps.
+
+**Step 1.** The window asks: "When should your PC turn off each night?"
+
+1. Enter the hour and the minute. Use the 24-hour format.
+2. Click **NEXT**.
+
+**Step 2.** The window shows the other times. ShutCap calculates them from your turn-off time. You can edit each time.
+
+| Event | Default time |
+| --- | --- |
+| First warning | 45 minutes before turn-off |
+| Second warning | 25 minutes before turn-off |
+| Curfew starts (dialog and countdown) | 15 minutes before turn-off |
+| Reminder | 10 minutes before turn-off |
+| Reminder | 5 minutes before turn-off |
+| Last-minute warning | 1 minute before turn-off |
+| PC turns off | Your chosen time |
+
+Step 2 also has the **Dry-run (practice) mode** check box. This box is on by default. In dry-run mode, ShutCap shows the warnings but does not turn off the PC.
+
+Click **FINISH** to save the schedule. If you close the setup window, ShutCap keeps the default times.
+
+You can change all times later in Settings. A schedule can cross midnight, for example turn-off at 00:30.
+
+## Daily use
+
+ShutCap runs in the system tray. Open the dashboard from the tray icon.
+
+The dashboard shows the status and the schedule for tonight. It has these buttons:
+
+- **TEST CURFEW**: shows the curfew dialog only. It does not start a shutdown.
+- **ABORT PENDING SHUTDOWN**: stops a shutdown that is in progress.
+- **RE-ARM CURFEW (RESET TO NORMAL)**: turns the schedule on again after an emergency or an abort.
+
+ShutCap allows only one running copy. If you start it again, ShutCap shows a message and does not open a second copy.
+
+## The curfew
+
+At the curfew start, ShutCap shows a topmost dialog. The text is "PC TIME IS OVER. Is there a genuine emergency?" The dialog has two buttons:
+
+- **NO EMERGENCY**
+- **GENUINE EMERGENCY**
+
+If you ignore the dialog, the shutdown continues.
+
+A floating countdown window shows the time that remains.
+
+To cancel tonight, use one of these methods:
+
+1. **Emergency.** Click **GENUINE EMERGENCY**. Write a reason. Tick the confirmation box. ShutCap cancels tonight and writes the event to the audit log.
+2. **Abort.** Click **ABORT PENDING SHUTDOWN** on the dashboard. Confirm the question. ShutCap runs `shutdown /a` and writes the event to the audit log.
+
+To stop a shutdown by hand:
+
+1. Press Win+R.
+2. Type `shutdown /a`.
+3. Press Enter.
+
+If Windows refuses the shutdown command, the status changes to `SHUTDOWN_FAILED`. ShutCap shows an error message.
+
+## Safety rules
+
+ShutCap follows these rules. The code in `shutcap/scheduler.py` and the test file `tests/test_no_lockout.py` enforce them.
+
+- ShutCap enforces the turn-off at most once each night.
+- If the PC starts, restarts, or wakes from sleep after the curfew started, ShutCap does nothing that night. It shows no dialog, no countdown, and no warning.
+- ShutCap saves a heartbeat every 10 seconds. If the heartbeat is older than 60 seconds, ShutCap knows that the PC was off or asleep.
+- If you restart the app while the PC stays on, the countdown continues.
+- ShutCap shows no old pop-ups the next morning.
+- An alert never repeats after a restart. If several alerts are late at the same time, ShutCap shows only the most recent alert.
+- When the night window ends, ShutCap closes unfinished nights without a message.
+
+## Settings
+
+Open Settings from the dashboard or the tray icon. ShutCap applies each change immediately.
+
+In Settings you can:
+
+- Change the turn-off time and all warning times.
+- Turn dry-run mode on or off.
+- Turn **Start ShutCap automatically when Windows boots** on or off.
+- Set up Android push notifications.
+
+## Notifications
+
+ShutCap uses these alerts:
+
+- Windows toast messages
+- Warning sounds
+- Topmost warning pop-up windows
+- Optional Android push messages through [ntfy.sh](https://ntfy.sh)
+
+To use Android push messages:
+
+1. Install the ntfy app on your Android phone.
+2. In Settings, tick **Android Push (ntfy.sh topic)**.
+3. Enter a private topic name.
+4. In the ntfy app, subscribe to the same topic.
+
+> **NOTE:** Anyone who knows your topic name can read your messages. Use a long topic name that others cannot guess.
+
+### Logs
+
+ShutCap keeps its files in `%LOCALAPPDATA%\ShutCap`:
+
+- `audit.log` records each warning, decision, emergency, abort, and shutdown. Use the **AUDIT LOG** button to read it and to export it.
+- `app.log` is the application log.
+
+## Uninstall
+
+Use one of these methods:
+
+- Open Settings > Apps > Installed apps. Select **ShutCap**. Click **Uninstall**.
+- Open the Start Menu. Click **Uninstall ShutCap**.
+
+Click the one confirmation. The uninstaller removes these items:
+
+- The program files
+- The Start Menu, Desktop, and taskbar-pin shortcuts
+- The sign-in startup entry
+- The Installed apps entry
+- All settings, state files, and logs in `%LOCALAPPDATA%\ShutCap`
+
+## Run from source
+
+Requirement: Python 3.10 or newer.
+
+1. Clone the repository:
+
    ```
-3. Press `Enter`. Windows will immediately abort the pending shutdown.
+   git clone https://github.com/ZahinArman/shutcap.git
+   ```
 
-### 2. GUI Emergency Abort Button
-During the 11:00 PM – 11:15 PM grace period, the OFFLINE 11 dashboard displays a high-contrast **"ABORT PENDING SHUTDOWN"** button. Clicking it:
-- Prompts for confirmation.
-- Executes `shutdown /a`.
-- Updates the state to `SHUTDOWN_CANCELLED`.
-- Permanently logs the manual cancellation with timestamp to `%LOCALAPPDATA%\OFFLINE11\audit.log`.
+2. Install the packages:
 
-### 3. Genuine Emergency Exception Dialog
-If you click `GENUINE EMERGENCY` on the curfew modal:
-- You are prompted to provide a short reason.
-- You must check the self-discipline accountability confirmation box.
-- Tonight's curfew is permanently cancelled.
-- Normal curfew will resume automatically at 10:30 PM tomorrow.
+   ```
+   pip install -r requirements.txt
+   ```
 
----
+3. Start the app:
 
-## Building the Installer
+   ```
+   python shutcap\main.py
+   ```
 
-Requires Python with the packages in `requirements.txt` (includes PyInstaller). Double-click or run:
+Command-line options:
 
-```cmd
-build_exe.bat
+| Option | Effect |
+| --- | --- |
+| `--dry-run` | Forces dry-run mode. The PC does not turn off. |
+| `--live` | Forces live mode. The PC turns off. |
+| `--minimized` | Starts the app in the tray. |
+| `--accelerated FACTOR` | Runs a fast clock. `--accelerated 60` runs at 60 times speed. |
+| `--test-mode` | Runs the test schedule. See [Test mode](#test-mode). |
+| `--debug` | Writes detailed log entries. |
+| `--version` | Shows the version and exits. |
+
+## Test mode
+
+Test mode lets you see a full night in about 60 seconds.
+
+1. Run `run_test_mode.bat`, or run `python shutcap\main.py --test-mode --debug`.
+2. Watch the warnings, the curfew dialog, and the countdown.
+
+Test mode plays your own schedule on a fast clock. It always uses dry-run mode. It uses a temporary state folder, so it never changes the real night.
+
+The option `--accelerated 60` also uses a temporary state folder.
+
+## Start at sign-in by hand
+
+The installer sets this up for you. To do it by hand, use one of these methods:
+
+- In Settings, tick **Start ShutCap automatically when Windows boots**.
+- Add a registry value in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+
+For the registry method, use the value name `ShutCap`. Use this data, with the path to your file:
+
+```
+"C:\path\to\ShutCap.exe" --minimized
 ```
 
-The result is a single file, **`dist\OFFLINE11-Setup.exe`**, which carries the app and its uninstaller inside it. Upload that one file to a GitHub Release.
+## Build the installer
 
----
+1. Install the packages from `requirements.txt`. The file includes PyInstaller.
+2. Run `build_exe.bat`.
 
-## Automated Verification & Test Suite
+The script creates one file, `dist\ShutCap-Setup.exe`. The file contains the app and the uninstaller.
 
-OFFLINE 11 includes a comprehensive test suite covering all scheduling, state persistence, single-instance mutex, and shutdown logic.
+## Tests
 
-Run the test suite with:
-```cmd
+Run all tests with this command:
+
+```
 python tests\run_all_tests.py
 ```
 
-### Test Coverage Highlights:
-- `test_critical_acceptance_requirement_no_reshutdown_after_midnight`: Verifies the mandatory acceptance test (11:00 PM curfew -> 11:15 PM shutdown -> 12:00 AM turn on -> no reshutdown -> normal PC usage all day -> 10:30 PM next session begins).
-- `test_app_restart_during_countdown_preserves_remaining_time`: Verifies that a quick app restart (PC still on) resumes the exact remaining time rather than resetting it.
-- `tests/test_no_lockout.py`: No popup the morning after, no lockout after turning the PC back on or waking it, no alert replay after restarts, abort survives restarts, settings apply live, midnight-crossing schedules.
-- `test_ignored_curfew_dialog_still_shuts_down_at_11_15`: Verifies that ignoring the dialog still enforces the 11:15 PM shutdown.
-- `test_emergency_exception_cancels_shutdown`: Verifies emergency declaration cancels shutdown for the night.
-- `test_single_instance_acquisition_and_duplicate_rejection`: Verifies duplicate instances are blocked via Win32 named Mutex.
-- `test_dry_run_mode_never_executes_system_shutdown`: Verifies safety mode never touches system power.
+The test files are:
 
----
+- `tests/test_no_lockout.py` checks that ShutCap never locks you out.
+- `tests/test_state.py` checks the saved state and the heartbeat.
+- `tests/test_scheduler.py` checks the schedule and the alerts.
+- `tests/test_shutdown.py` checks the shutdown and abort commands.
+- `tests/test_single_instance.py` checks that only one copy runs.
+- `tests/test_notifications.py` checks the notifications.
 
-## Documented Limitations & Technical Trade-offs
+## Code layout
 
-1. **User Privileges**: Standard users can execute `shutdown.exe /s /t <sec>`. However, running in restricted enterprise domains with strict Group Policies (GPO) disabling shutdown may block execution; OFFLINE 11 detects this and reports `SHUTDOWN_FAILED`.
-2. **Blocking Applications**: Some Windows applications (e.g. unsaved Notepad, Word documents, or modal dialogs) may prompt the user during shutdown. Windows gives applications up to the grace period (`/t 60`) to save. OFFLINE 11 deliberately avoids `/f` (force-close) to protect user data from silent loss.
-3. **BIOS / CMOS Clock Tampering**: As a userland utility, OFFLINE 11 relies on the Windows local system clock. Changing system time manually in Windows Settings can shift schedule calculations. OFFLINE 11 logs all significant time jumps to the audit trail.
-4. **Physical Power Access**: This utility is a software self-discipline tool designed to remove mindless, late-night drifting. It cannot and does not lock the physical hardware power button or prevent hardware-level restarts.
+Top-level files:
+
+- `install.py` is the setup program for `ShutCap-Setup.exe`.
+- `uninstall.py` is the uninstaller.
+- `build_exe.bat` builds the installer.
+- `run_test_mode.bat` starts test mode.
+- `requirements.txt` lists the Python packages.
+
+Application files in `shutcap/`:
+
+- `main.py` parses the options and starts the app.
+- `config.py` reads and writes the settings and calculates the times.
+- `scheduler.py` decides when each alert and the shutdown occur.
+- `state.py` saves the state of the night and the heartbeat.
+- `shutdown.py` runs the shutdown and abort commands.
+- `notifications.py` sends toast, sound, and push alerts.
+- `autostart.py` sets the start at sign-in.
+- `single_instance.py` allows only one running copy.
+- `time_provider.py` gives the real clock or the fast test clock.
+- `logger.py` writes the app log and the audit log.
+
+User interface files in `shutcap/ui/`:
+
+- `main_window.py` is the dashboard.
+- `setup_wizard.py` is the two-step first-run window.
+- `settings_dialog.py` is the Settings window.
+- `curfew_dialog.py` is the emergency question dialog.
+- `emergency_dialog.py` collects the emergency reason.
+- `countdown_widget.py` is the floating countdown window.
+- `warning_dialog.py` is the topmost warning pop-up.
+- `audit_dialog.py` is the audit log viewer.
+- `tray.py` is the tray icon and menu.
+- `theme.py` sets the colors and fonts.
+
+## Limitations
+
+- ShutCap uses the Windows clock. If you change the clock, the schedule can move.
+- An app with unsaved work can delay the shutdown, because ShutCap does not use `/f`.
+- ShutCap is a self-discipline tool. It cannot stop the power button. It cannot stop a person who closes the app.
+- Group policy can block the shutdown command.
+
+## License
+
+ShutCap uses the MIT license. See the file [LICENSE](LICENSE).

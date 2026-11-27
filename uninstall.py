@@ -1,5 +1,5 @@
 """
-Uninstaller for OFFLINE 11.
+Uninstaller for ShutCap.
 Removes everything the app created: program files, shortcuts (incl. taskbar pin),
 registry entries, settings/state/logs, and test-mode temp folders.
 """
@@ -19,9 +19,9 @@ from ctypes import wintypes
 from pathlib import Path
 from tkinter import messagebox
 
-APP_NAME = "OFFLINE 11"
-APP_EXE = "OFFLINE11.exe"
-UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\OFFLINE11"
+APP_NAME = "ShutCap"
+APP_EXE = "ShutCap.exe"
+UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\ShutCap"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 CREATE_NEW_PROCESS_GROUP = 0x00000200
@@ -37,7 +37,7 @@ def _shell_folder(csidl: int) -> Path:
 def get_targets() -> tuple[Path, Path, list[Path]]:
     local_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     install_dir = local_app_data / "Programs" / APP_NAME
-    data_dir = local_app_data / "OFFLINE11"
+    data_dir = local_app_data / "ShutCap"
     programs = _shell_folder(0x0002)   # CSIDL_PROGRAMS
     desktop = _shell_folder(0x0010)    # CSIDL_DESKTOPDIRECTORY
     appdata = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
@@ -83,7 +83,7 @@ def schedule_delete_after_exit(install_dir: Path) -> None:
     """
     # Paths are passed as arguments (not written into the script) so non-ASCII user names work.
     # The retry loop also covers PyInstaller's launcher process, which exits just after this one.
-    script = Path(tempfile.gettempdir()) / f"offline11_cleanup_{os.getpid()}.cmd"
+    script = Path(tempfile.gettempdir()) / f"shutcap_cleanup_{os.getpid()}.cmd"
     # System tools are called by full path (a user's PATH may contain other "find" programs),
     # and "ping" is used as the delay because it works without a console.
     script.write_text(
@@ -128,9 +128,9 @@ def perform_uninstall() -> None:
     # Settings, state, audit and app logs.
     remove_dir(data_dir)
     # Fallback data location used when %LOCALAPPDATA% is not set.
-    remove_dir(Path.home() / ".offline11")
+    remove_dir(Path.home() / ".shutcap")
     # Throwaway folders created by test mode / --accelerated.
-    for leftover in Path(tempfile.gettempdir()).glob("offline11_sim_*"):
+    for leftover in Path(tempfile.gettempdir()).glob("shutcap_sim_*"):
         remove_dir(leftover)
 
     # Program files.

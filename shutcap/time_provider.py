@@ -1,5 +1,5 @@
 """
-Time provider module for OFFLINE 11.
+Time provider module for ShutCap.
 Provides clock abstraction supporting both real local system time
 and virtual time for tests and accelerated simulation.
 """

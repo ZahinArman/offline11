@@ -2,22 +2,22 @@
 setlocal
 cd /d "%~dp0"
 echo ============================================================
-echo Building OFFLINE 11 Setup (single self-contained installer)
+echo Building ShutCap Setup (single self-contained installer)
 echo ============================================================
 
-echo [1/3] Building OFFLINE 11 application...
-python -m PyInstaller --noconsole --onedir --name OFFLINE11 --icon assets\icon.ico ^
+echo [1/3] Building ShutCap application...
+python -m PyInstaller --noconsole --onedir --name ShutCap --icon assets\icon.ico ^
     --add-data "assets\icon.png;assets" --add-data "assets\icon.ico;assets" ^
-    --clean -y offline11\main.py
+    --clean -y shutcap\main.py
 if errorlevel 1 goto :fail
 
 echo [2/3] Building uninstaller...
 python -m PyInstaller --noconsole --onefile --name uninstall --icon assets\icon.ico -y uninstall.py
 if errorlevel 1 goto :fail
 
-echo [3/3] Building OFFLINE11-Setup.exe (bundles the app and uninstaller)...
-python -m PyInstaller --noconsole --onefile --name OFFLINE11-Setup --icon assets\icon.ico ^
-    --add-data "dist\OFFLINE11;payload\OFFLINE11" ^
+echo [3/3] Building ShutCap-Setup.exe (bundles the app and uninstaller)...
+python -m PyInstaller --noconsole --onefile --name ShutCap-Setup --icon assets\icon.ico ^
+    --add-data "dist\ShutCap;payload\ShutCap" ^
     --add-data "dist\uninstall.exe;payload" ^
     --add-data "assets\icon.ico;payload" ^
     -y install.py
@@ -25,7 +25,7 @@ if errorlevel 1 goto :fail
 
 echo.
 echo ============================================================
-echo Done. Share this single file:  dist\OFFLINE11-Setup.exe
+echo Done. Share this single file:  dist\ShutCap-Setup.exe
 echo ============================================================
 pause
 exit /b 0

@@ -1,5 +1,5 @@
 """
-Persistent floating countdown widget for OFFLINE 11.
+Persistent floating countdown widget for ShutCap.
 Stays topmost during the 11:00 PM - 11:15 PM shutdown grace period,
 showing remaining time in large monospace format.
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Callable, Optional
 
-from offline11.ui.theme import (
+from shutcap.ui.theme import (
     BG_BUTTON,
     BG_BUTTON_HOVER,
     BG_CRITICAL,
@@ -39,7 +39,7 @@ class CountdownWidget(tk.Toplevel):
         self.on_emergency_click = on_emergency_click
         self.is_dry_run = is_dry_run
 
-        self.title("CURFEW COUNTDOWN — OFFLINE 11")
+        self.title("CURFEW COUNTDOWN — ShutCap")
         self.configure(bg=BG_DARK)
         self.overrideredirect(False)  # Keep window frame for moving/docking
         self.geometry("380x170")

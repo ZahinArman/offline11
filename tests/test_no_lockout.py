@@ -13,12 +13,12 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from offline11.config import Config
-from offline11.logger import AuditLogger
-from offline11.scheduler import Scheduler
-from offline11.shutdown import ShutdownManager
-from offline11.state import CurfewStatus, StateManager
-from offline11.time_provider import VirtualTimeProvider
+from shutcap.config import Config
+from shutcap.logger import AuditLogger
+from shutcap.scheduler import Scheduler
+from shutcap.shutdown import ShutdownManager
+from shutcap.state import CurfewStatus, StateManager
+from shutcap.time_provider import VirtualTimeProvider
 
 TZ = timezone(timedelta(hours=6))
 
@@ -163,6 +163,16 @@ class TestMidnightSchedule(unittest.TestCase):
     def test_midnight_schedule_is_valid(self) -> None:
         self.config.validate()
         self.assertEqual(self.config.minutes_between("curfew", "shutdown"), 15)
+
+    def test_first_run_defaults_from_chosen_shutdown_time(self) -> None:
+        times = Config.schedule_for_shutdown("00:30")
+        self.assertEqual(times["warning_1_time"], "23:45")
+        self.assertEqual(times["curfew_time"], "00:15")
+        self.assertEqual(times["shutdown_time"], "00:30")
+        Config(**times).validate()
+        self.assertEqual(Config.schedule_for_shutdown("23:15"), {
+            k: getattr(Config(), k) for k in times
+        })
 
     def test_out_of_order_schedule_is_rejected(self) -> None:
         bad = Config(curfew_time="22:40")  # before Warning 2 (22:50)

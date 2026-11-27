@@ -1,5 +1,5 @@
 """
-Unit tests for OFFLINE 11 Timeline Scheduler.
+Unit tests for ShutCap Timeline Scheduler.
 Verifies the normal warning sequence, ignored curfew dialog, emergency exception,
 deduplication, and sleep/wake time jumps using VirtualTimeProvider.
 """
@@ -11,12 +11,12 @@ import unittest
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
-from offline11.config import Config
-from offline11.logger import AuditLogger
-from offline11.scheduler import Scheduler
-from offline11.shutdown import ShutdownManager
-from offline11.state import CurfewStatus, StateManager
-from offline11.time_provider import VirtualTimeProvider
+from shutcap.config import Config
+from shutcap.logger import AuditLogger
+from shutcap.scheduler import Scheduler
+from shutcap.shutdown import ShutdownManager
+from shutcap.state import CurfewStatus, StateManager
+from shutcap.time_provider import VirtualTimeProvider
 
 
 class TestScheduler(unittest.TestCase):

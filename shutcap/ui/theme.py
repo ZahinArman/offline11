@@ -1,5 +1,5 @@
 """
-Dark monochrome system theme for OFFLINE 11.
+Dark monochrome system theme for ShutCap.
 Clean, restrained, professional system utility aesthetics.
 """
 

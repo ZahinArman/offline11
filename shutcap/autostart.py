@@ -1,5 +1,5 @@
 """
-Windows Auto-Startup Manager for OFFLINE 11.
+Windows Auto-Startup Manager for ShutCap.
 Manages HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run registry entry.
 """
 
@@ -17,11 +17,11 @@ else:
     winreg = None
 
 REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-APP_REG_NAME = "OFFLINE 11"
+APP_REG_NAME = "ShutCap"
 
 
 def get_default_command() -> str:
-    """Returns the command to start OFFLINE 11 at user login."""
+    """Returns the command to start ShutCap at user login."""
     # Check if frozen executable (PyInstaller)
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}" --minimized'
@@ -54,7 +54,7 @@ def is_autostart_enabled() -> bool:
 
 
 def enable_autostart(command: Optional[str] = None) -> bool:
-    """Adds OFFLINE 11 to Windows startup registry."""
+    """Adds ShutCap to Windows startup registry."""
     if winreg is None:
         logging.warning("winreg not available on this platform.")
         return False
@@ -71,7 +71,7 @@ def enable_autostart(command: Optional[str] = None) -> bool:
 
 
 def disable_autostart() -> bool:
-    """Removes OFFLINE 11 from Windows startup registry."""
+    """Removes ShutCap from Windows startup registry."""
     if winreg is None:
         return False
     try:

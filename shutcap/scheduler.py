@@ -1,5 +1,5 @@
 """
-Timeline Scheduler module for OFFLINE 11.
+Timeline Scheduler module for ShutCap.
 
 Rules (in priority order):
 1. Each night's schedule is enforced at most once.
@@ -16,11 +16,11 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Callable, Dict, Optional, Tuple
 
-from offline11.config import MILESTONES, Config
-from offline11.logger import AuditLogger
-from offline11.shutdown import ShutdownManager
-from offline11.state import CurfewStatus, StateManager
-from offline11.time_provider import TimeProvider
+from shutcap.config import MILESTONES, Config
+from shutcap.logger import AuditLogger
+from shutcap.shutdown import ShutdownManager
+from shutcap.state import CurfewStatus, StateManager
+from shutcap.time_provider import TimeProvider
 
 # How late the shutdown may still fire after its scheduled time (covers a slow tick).
 SHUTDOWN_TOLERANCE = timedelta(minutes=2)
@@ -206,7 +206,7 @@ class Scheduler:
         self.audit_logger.log("SHUTDOWN_INITIATED", "Curfew grace period expired. Dispatching shutdown.", dt=now)
 
         success, msg = self.shutdown_mgr.execute_shutdown(
-            comment="OFFLINE 11: Curfew shutdown initiated. Save your work.",
+            comment="ShutCap: Curfew shutdown initiated. Save your work.",
             grace_seconds=self.config.shutdown_grace_seconds,
         )
 
