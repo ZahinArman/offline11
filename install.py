@@ -20,11 +20,10 @@ import shutil
 import subprocess
 import sys
 import time
-import tkinter as tk
+import webbrowser
 import winreg
 from ctypes import wintypes
 from pathlib import Path
-from tkinter import messagebox
 from typing import Optional
 
 APP_NAME = "ShutCap"
@@ -38,35 +37,11 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 SILENT = "--silent" in sys.argv
 
 
-# --- UI helpers ------------------------------------------------------------------------
-
-def _root() -> tk.Tk:
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    return root
+RELEASES_URL = "https://github.com/ZahinArman/shutcap/releases/latest"
 
 
-def show_message(title: str, message: str, is_error: bool = False) -> None:
-    print(f"[{'ERROR' if is_error else 'INFO'}] {title}: {message}")
-    if SILENT:
-        return
-    try:
-        root = _root()
-        (messagebox.showerror if is_error else messagebox.showinfo)(title, message, parent=root)
-        root.destroy()
-    except Exception:
-        pass
-
-
-def ask_yes_no(title: str, message: str) -> bool:
-    if SILENT:
-        return True
-    root = _root()
-    try:
-        return messagebox.askyesno(title, message, parent=root)
-    finally:
-        root.destroy()
+def log(message: str) -> None:
+    print(f"[ShutCap Setup] {message}")
 
 
 # --- Paths -----------------------------------------------------------------------------
@@ -77,12 +52,50 @@ def _shell_folder(csidl: int) -> Path:
     return Path(buf.value)
 
 
-def get_paths() -> tuple[Path, Path, Path]:
+def default_install_dir() -> Path:
     local_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    install_dir = local_app_data / "Programs" / APP_NAME
-    start_menu_dir = _shell_folder(0x0002)  # CSIDL_PROGRAMS
-    desktop_dir = _shell_folder(0x0010)     # CSIDL_DESKTOPDIRECTORY
-    return install_dir, start_menu_dir, desktop_dir
+    return local_app_data / "Programs" / APP_NAME
+
+
+def existing_install_dir() -> Optional[Path]:
+    """The folder of an installed copy (from Settings > Apps), if there is one."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as key:
+            location = Path(winreg.QueryValueEx(key, "InstallLocation")[0])
+        if (location / APP_EXE).exists():
+            return location
+    except OSError:
+        pass
+    default = default_install_dir()
+    return default if (default / APP_EXE).exists() else None
+
+
+def target_for(picked: Path) -> Path:
+    """ShutCap always goes into its own folder, so it never mixes with (or deletes) other files."""
+    return picked if picked.name.lower() == APP_NAME.lower() else picked / APP_NAME
+
+
+def check_folder(install_dir: Path) -> Optional[str]:
+    """Returns a short error for the UI, or None if the folder can be used."""
+    if install_dir.exists():
+        if not install_dir.is_dir():
+            return "Choose a folder, not a file."
+        if any(install_dir.iterdir()) and not (install_dir / APP_EXE).exists():
+            return "This folder has other files in it. Choose a different folder."
+    probe_parent = install_dir if install_dir.exists() else next((p for p in install_dir.parents if p.exists()), None)
+    if probe_parent is None:
+        return "This drive is not available."
+    try:
+        probe = probe_parent / f".shutcap_write_test_{os.getpid()}"
+        probe.write_text("x", encoding="ascii")
+        probe.unlink()
+    except OSError:
+        return "You cannot save files in this folder. Choose a different folder."
+    return None
+
+
+def get_shell_dirs() -> tuple[Path, Path]:
+    return _shell_folder(0x0002), _shell_folder(0x0010)  # CSIDL_PROGRAMS, CSIDL_DESKTOPDIRECTORY
 
 
 def find_payload() -> tuple[Optional[Path], Optional[Path], Optional[Path]]:
@@ -131,7 +144,8 @@ def _retry(action, attempts: int = 10) -> None:
 
 def copy_program_files(app_dir: Path, uninstaller: Optional[Path], icon: Optional[Path], install_dir: Path) -> None:
     # Clean install: remove old program files so upgrades never leave stale files behind.
-    if install_dir.exists():
+    # Only an existing ShutCap folder is ever deleted (check_folder refuses folders with other files).
+    if install_dir.exists() and (install_dir / APP_EXE).exists():
         _retry(lambda: shutil.rmtree(install_dir))
     install_dir.mkdir(parents=True, exist_ok=True)
     _retry(lambda: shutil.copytree(app_dir, install_dir, dirs_exist_ok=True))
@@ -203,27 +217,12 @@ def launch_app(app_exe: Path) -> None:
     subprocess.Popen([str(app_exe)], cwd=str(app_exe.parent), env=env, close_fds=True)
 
 
-def install() -> None:
-    app_dir, uninstaller, icon = find_payload()
-    if app_dir is None:
-        show_message(
-            "Installation Error",
-            "The ShutCap program files were not found inside this setup.\n"
-            "Please download ShutCap-Setup.exe again from the Releases page.",
-            is_error=True,
-        )
-        sys.exit(1)
-
-    install_dir, start_menu_dir, desktop_dir = get_paths()
-    upgrading = (install_dir / APP_EXE).exists()
-    if not ask_yes_no(
-        f"{APP_NAME} Setup",
-        (f"Update {APP_NAME} to version {VERSION}?" if upgrading else f"Install {APP_NAME} {VERSION}?")
-        + f"\n\nLocation: {install_dir}\n\n"
-        "It will start automatically when you sign in to Windows (you can turn this off in Settings).",
-    ):
-        sys.exit(0)
-
+def do_install(app_dir: Path, uninstaller: Optional[Path], icon: Optional[Path],
+               install_dir: Path, autostart: bool, launch: bool = True) -> None:
+    error = check_folder(install_dir)
+    if error:
+        raise ValueError(error)
+    start_menu_dir, desktop_dir = get_shell_dirs()
     stop_running_app()
     copy_program_files(app_dir, uninstaller, icon, install_dir)
 
@@ -234,16 +233,59 @@ def install() -> None:
     if (install_dir / "uninstall.exe").exists():
         create_shortcut(install_dir / "uninstall.exe", start_menu_dir / f"Uninstall {APP_NAME}.lnk", icon_dest, f"Uninstall {APP_NAME}")
     register_app(install_dir)
-    enable_autostart(app_exe)
-    launch_app(app_exe)
+    if autostart:
+        enable_autostart(app_exe)
+    else:
+        disable_autostart()
+    if launch:
+        launch_app(app_exe)
 
-    show_message(
-        f"{APP_NAME} Setup",
-        f"{APP_NAME} is installed and running (look for its icon near the clock).\n\n"
-        "• It starts in safe Dry-Run mode: untick Dry-Run in Settings to enable real shutdowns\n"
-        "• Find it in the Start Menu or on your Desktop\n"
-        "• Uninstall anytime from Settings > Apps > Installed apps",
-    )
+
+def disable_autostart() -> None:
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.DeleteValue(key, APP_NAME)
+    except OSError:
+        pass
+
+
+def install() -> None:
+    app_dir, uninstaller, icon = find_payload()
+    existing = existing_install_dir()
+
+    if SILENT:
+        if app_dir is None:
+            log("The program files were not found inside this setup.")
+            sys.exit(1)
+        target = existing or default_install_dir()
+        do_install(app_dir, uninstaller, icon, target, autostart=True)
+        log(f"Installed to {target}")
+        return
+
+    from shutcap.ui.setup_window import SetupApi, run_setup_window
+
+    state = {"stage": "install", "folder": str(existing or default_install_dir()),
+             "upgrade": existing is not None, "version": VERSION, "error": ""}
+    if app_dir is None:
+        state.update(stage="failed", error="This setup file is damaged. Download it again.", action="Open download page")
+    else:
+        state["error"] = check_folder(Path(state["folder"])) or ""
+
+    def worker(autostart: bool) -> dict:
+        target = Path(api.status()["folder"])
+        error = check_folder(target)
+        if error:
+            return {"stage": "install", "error": error}
+        do_install(app_dir, uninstaller, icon, target, autostart=autostart)
+        return {"stage": "done"}
+
+    def choose(picked: str) -> dict:
+        target = target_for(Path(picked))
+        return {"folder": str(target), "error": check_folder(target) or ""}
+
+    api = SetupApi("install", state, worker, choose_folder=choose,
+                   failed_action=lambda: webbrowser.open(RELEASES_URL))
+    run_setup_window(api, f"{APP_NAME} Setup")
 
 
 if __name__ == "__main__":
@@ -252,5 +294,5 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except Exception as e:
-        show_message("Installation Error", f"Failed to install {APP_NAME}:\n{e}", is_error=True)
+        log(f"Failed to install {APP_NAME}: {e}")
         sys.exit(1)

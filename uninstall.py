@@ -13,11 +13,10 @@ import subprocess
 import sys
 import tempfile
 import time
-import tkinter as tk
 import winreg
 from ctypes import wintypes
 from pathlib import Path
-from tkinter import messagebox
+from typing import Optional
 
 APP_NAME = "ShutCap"
 APP_EXE = "ShutCap.exe"
@@ -34,9 +33,26 @@ def _shell_folder(csidl: int) -> Path:
     return Path(buf.value)
 
 
+def installed_location() -> Optional[Path]:
+    """The install folder recorded by setup (the user may have chosen a custom folder)."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as key:
+            return Path(winreg.QueryValueEx(key, "InstallLocation")[0])
+    except OSError:
+        return None
+
+
+def is_shutcap_folder(path: Path) -> bool:
+    """Never delete a folder unless it is clearly ShutCap's own."""
+    return path.name.lower() == APP_NAME.lower() and (
+        (path / APP_EXE).exists() or (path / "uninstall.exe").exists() or not path.exists() or not any(path.iterdir())
+    )
+
+
 def get_targets() -> tuple[Path, Path, list[Path]]:
     local_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    install_dir = local_app_data / "Programs" / APP_NAME
+    running_from = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else None
+    install_dir = installed_location() or (running_from if running_from and (running_from / APP_EXE).exists() else None)         or local_app_data / "Programs" / APP_NAME
     data_dir = local_app_data / "ShutCap"
     programs = _shell_folder(0x0002)   # CSIDL_PROGRAMS
     desktop = _shell_folder(0x0010)    # CSIDL_DESKTOPDIRECTORY
@@ -112,7 +128,7 @@ def schedule_delete_after_exit(install_dir: Path) -> None:
             continue
 
 
-def perform_uninstall() -> None:
+def perform_uninstall(keep_data: bool = False) -> None:
     install_dir, data_dir, shortcuts = get_targets()
 
     stop_running_app()
@@ -125,15 +141,18 @@ def perform_uninstall() -> None:
 
     remove_registry_entries()
 
-    # Settings, state, audit and app logs.
-    remove_dir(data_dir)
-    # Fallback data location used when %LOCALAPPDATA% is not set.
-    remove_dir(Path.home() / ".shutcap")
+    # Settings, state, audit and app logs (unless the user keeps them).
+    if not keep_data:
+        remove_dir(data_dir)
+        # Fallback data location used when %LOCALAPPDATA% is not set.
+        remove_dir(Path.home() / ".shutcap")
     # Throwaway folders created by test mode / --accelerated.
     for leftover in Path(tempfile.gettempdir()).glob("shutcap_sim_*"):
         remove_dir(leftover)
 
     # Program files.
+    if not is_shutcap_folder(install_dir):
+        return
     running_from = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve()
     if install_dir in running_from.parents:
         schedule_delete_after_exit(install_dir)
@@ -146,24 +165,14 @@ def main() -> None:
         perform_uninstall()
         sys.exit(0)
 
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    try:
-        if not messagebox.askyesno(
-            f"Uninstall {APP_NAME}",
-            f"Remove {APP_NAME} completely from this computer?\n\n"
-            "This removes the app, its shortcuts, its startup entry, and all of its settings and logs.",
-            icon="warning",
-            parent=root,
-        ):
-            return
-        perform_uninstall()
-        messagebox.showinfo(f"Uninstall {APP_NAME}", f"{APP_NAME} has been removed from your computer.", parent=root)
-    except Exception as e:
-        messagebox.showerror(f"Uninstall {APP_NAME}", f"Something went wrong while uninstalling:\n{e}", parent=root)
-    finally:
-        root.destroy()
+    from shutcap.ui.setup_window import SetupApi, run_setup_window
+
+    def worker(keep_data: bool) -> dict:
+        perform_uninstall(keep_data=keep_data)
+        return {"stage": "done"}
+
+    api = SetupApi("uninstall", {"stage": "uninstall", "error": ""}, worker)
+    run_setup_window(api, f"Uninstall {APP_NAME}", height=400)
 
 
 if __name__ == "__main__":

@@ -1,79 +1,59 @@
 """
-System tray icon and menu for ShutCap using pystray.
+System tray icon and menu for ShutCap (pystray).
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 import threading
 from pathlib import Path
 from typing import Callable, Optional
 
-from PIL import Image
 import pystray
+from PIL import Image
 from pystray import Menu, MenuItem
 
-from shutcap.config import ConfigManager
-from shutcap.state import StateManager
+
+def _icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", "")) / "assets" / "icon.png"
+    return Path(__file__).resolve().parent.parent.parent / "assets" / "icon.png"
 
 
 class SystemTray:
-    """Manages the background system tray icon and menu."""
+    """The icon near the clock. Left-click opens ShutCap; the menu has the rest."""
 
     def __init__(
         self,
-        config_mgr: ConfigManager,
-        state_mgr: StateManager,
-        on_show_window: Callable[[], None],
-        on_open_settings: Callable[[], None],
-        on_open_audit: Callable[[], None],
-        on_exit_app: Callable[[], None],
+        status_text: Callable[[], str],
+        on_open: Callable[[], None],
+        on_settings: Callable[[], None],
+        on_history: Callable[[], None],
+        on_quit: Callable[[], None],
         icon_path: Optional[Path] = None,
     ) -> None:
-        self.config_mgr = config_mgr
-        self.state_mgr = state_mgr
-        self.on_show_window = on_show_window
-        self.on_open_settings = on_open_settings
-        self.on_open_audit = on_open_audit
-        self.on_exit_app = on_exit_app
-
-        if icon_path is None:
-            icon_path = Path(__file__).parent.parent.parent / "assets" / "icon.png"
-        self.icon_path = icon_path
-
-        self._image = Image.open(self.icon_path)
+        self.status_text = status_text
+        self.on_open = on_open
+        self.on_settings = on_settings
+        self.on_history = on_history
+        self.on_quit = on_quit
+        self._image = Image.open(icon_path or _icon_path())
         self._icon: Optional[pystray.Icon] = None
-        self._thread: Optional[threading.Thread] = None
 
-    def _create_menu(self) -> Menu:
-        def _get_status_text(item: MenuItem) -> str:
-            status = self.state_mgr.get_status().value
-            mode = "DRY RUN" if self.config_mgr.config.dry_run else "LIVE"
-            return f"Status: {status} [{mode}]"
-
-        def _get_curfew_text(item: MenuItem) -> str:
-            return f"Curfew: {self.config_mgr.config.curfew_time}"
-
-        menu = Menu(
-            MenuItem("Open ShutCap", lambda: self.on_show_window(), default=True),
-            MenuItem(_get_status_text, None, enabled=False),
-            MenuItem(_get_curfew_text, None, enabled=False),
+    def _menu(self) -> Menu:
+        return Menu(
+            MenuItem("Open ShutCap", lambda: self.on_open(), default=True),
+            MenuItem(lambda _item: self.status_text(), None, enabled=False),
             Menu.SEPARATOR,
-            MenuItem("Settings...", lambda: self.on_open_settings()),
-            MenuItem("Audit Log...", lambda: self.on_open_audit()),
+            MenuItem("Settings", lambda: self.on_settings()),
+            MenuItem("History", lambda: self.on_history()),
             Menu.SEPARATOR,
-            MenuItem("Exit ShutCap", lambda: self.on_exit_app()),
+            MenuItem("Quit ShutCap", lambda: self.on_quit()),
         )
-        return menu
 
     def start(self) -> None:
-        """Starts the system tray icon in a dedicated daemon thread."""
-        self._icon = pystray.Icon(
-            name="ShutCap",
-            icon=self._image,
-            title="ShutCap",
-            menu=self._create_menu(),
-        )
+        self._icon = pystray.Icon(name="ShutCap", icon=self._image, title="ShutCap", menu=self._menu())
 
         def _run() -> None:
             try:
@@ -81,11 +61,16 @@ class SystemTray:
             except Exception as e:
                 logging.error(f"System tray icon error: {e}")
 
-        self._thread = threading.Thread(target=_run, daemon=True)
-        self._thread.start()
+        threading.Thread(target=_run, daemon=True, name="shutcap-tray").start()
+
+    def refresh(self) -> None:
+        if self._icon is not None:
+            try:
+                self._icon.update_menu()
+            except Exception:
+                pass
 
     def stop(self) -> None:
-        """Stops and removes the system tray icon."""
         if self._icon is not None:
             try:
                 self._icon.stop()

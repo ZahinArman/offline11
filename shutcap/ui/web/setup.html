@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ShutCap Setup</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { display: flex; flex-direction: column; }
+  .stage { flex: 1; display: none; flex-direction: column; padding: 4px 28px 26px; }
+  .stage.active { display: flex; animation: fadeIn .35s var(--ease) both; }
+  .hero-icon { width: 64px; height: 64px; border-radius: 15px; margin: 8px 0 18px; box-shadow: var(--shadow); }
+  .lead { color: var(--ink-2); margin-top: 6px; }
+  .grow { flex: 1; }
+  .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; color: var(--ink-2); font-size: 12.5px; }
+  .error-line { color: var(--danger); font-size: 12px; margin: 8px 4px 0; min-height: 18px; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .bar { height: 4px; border-radius: 4px; background: var(--fill); overflow: hidden; margin-top: 22px; }
+  .bar i { display: block; height: 100%; width: 40%; background: var(--clay); border-radius: 4px; animation: slide 1.1s var(--ease) infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+  .check { width: 64px; height: 64px; border-radius: 50%; background: var(--clay-soft); color: var(--clay-ink); display: grid; place-items: center; margin: 8px 0 18px; }
+  .check svg { width: 28px; height: 28px; }
+  .check.bad { background: rgba(194, 64, 47, .12); color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="titlebar pywebview-drag-region">
+  <div class="grow pywebview-drag-region"></div>
+  <button class="iconbtn close" id="win-close" title="Close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></svg></button>
+</div>
+
+<!-- Install -->
+<section class="stage" id="s-install">
+  <img class="hero-icon" src="icon.png" alt="">
+  <h1 class="title" id="i-title">Install ShutCap</h1>
+  <p class="lead" id="i-lead">Turns your PC off at the time you choose.</p>
+  <div class="section-h" style="margin-top:22px">Folder</div>
+  <div class="group">
+    <div class="row"><span class="path" id="i-path"></span><button class="btn" id="i-change" style="height:30px;padding:0 12px">Change…</button></div>
+    <label class="row"><span class="label">Start with Windows</span><span class="switch"><input type="checkbox" id="i-autostart" checked><span></span></span></label>
+  </div>
+  <div class="error-line" id="i-error"></div>
+  <div class="grow"></div>
+  <button class="btn primary wide" id="i-go">Install</button>
+</section>
+
+<!-- Uninstall -->
+<section class="stage" id="s-uninstall">
+  <img class="hero-icon" src="icon.png" alt="">
+  <h1 class="title">Remove ShutCap?</h1>
+  <p class="lead">This removes the app, its shortcuts and its startup entry.</p>
+  <div class="group" style="margin-top:22px">
+    <label class="row"><span class="label">Keep my settings and history</span><span class="switch"><input type="checkbox" id="u-keep"><span></span></span></label>
+  </div>
+  <div class="grow"></div>
+  <div class="actions"><button class="btn" id="u-cancel">Cancel</button><button class="btn danger" id="u-go">Remove</button></div>
+</section>
+
+<!-- Working -->
+<section class="stage" id="s-working">
+  <img class="hero-icon" src="icon.png" alt="">
+  <h1 class="title" id="w-title">Installing…</h1>
+  <p class="lead" id="w-lead">This takes a few seconds.</p>
+  <div class="bar"><i></i></div>
+</section>
+
+<!-- Done -->
+<section class="stage" id="s-done">
+  <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+  <h1 class="title" id="d-title">ShutCap is running</h1>
+  <p class="lead" id="d-lead">Find it next to the clock.</p>
+  <div class="grow"></div>
+  <button class="btn primary wide" id="d-go">Done</button>
+</section>
+
+<!-- Failed -->
+<section class="stage" id="s-failed">
+  <div class="check bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 7v6M12 16.5v.5"/></svg></div>
+  <h1 class="title" id="f-title">Setup did not finish</h1>
+  <p class="lead" id="f-lead"></p>
+  <div class="grow"></div>
+  <div class="actions"><button class="btn" id="f-close">Close</button><button class="btn primary" id="f-action" hidden></button></div>
+</section>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let api = null, S = null;
+
+function stage(name) {
+  document.querySelectorAll(".stage").forEach(s => s.classList.toggle("active", s.id === "s-" + name));
+}
+function render(s) {
+  S = s;
+  if (s.stage === "install") {
+    $("i-title").textContent = s.upgrade ? "Update ShutCap" : "Install ShutCap";
+    $("i-lead").textContent = s.upgrade ? `Version ${s.version}. Your settings stay.` : "Turns your PC off at the time you choose.";
+    $("i-go").textContent = s.upgrade ? "Update" : "Install";
+    $("i-path").textContent = s.folder;
+    $("i-path").title = s.folder;
+    $("i-change").hidden = !!s.upgrade;
+    $("i-error").textContent = s.error || "";
+    $("i-go").disabled = !!s.error;
+  }
+  if (s.stage === "working") {
+    $("w-title").textContent = s.mode === "uninstall" ? "Removing…" : (s.upgrade ? "Updating…" : "Installing…");
+  }
+  if (s.stage === "done") {
+    $("d-title").textContent = s.mode === "uninstall" ? "ShutCap is removed" : "ShutCap is running";
+    $("d-lead").textContent = s.mode === "uninstall" ? "Thank you for using it." : "Find it next to the clock.";
+  }
+  if (s.stage === "failed") {
+    $("f-title").textContent = s.mode === "uninstall" ? "ShutCap was not removed" : "Setup did not finish";
+    $("f-lead").textContent = s.error || "";
+    $("f-action").hidden = !s.action;
+    if (s.action) $("f-action").textContent = s.action;
+  }
+  stage(s.stage);
+}
+async function refresh() { render(await api.status()); }
+
+function init() {
+  if (api) return;
+  api = window.pywebview.api;
+  $("win-close").onclick = () => api.close();
+  $("i-change").onclick = async () => render(await api.choose_folder());
+  $("i-go").onclick = async () => { render(await api.install($("i-autostart").checked)); poll(); };
+  $("u-cancel").onclick = () => api.close();
+  $("u-go").onclick = async () => { render(await api.uninstall($("u-keep").checked)); poll(); };
+  $("d-go").onclick = () => api.close();
+  $("f-close").onclick = () => api.close();
+  $("f-action").onclick = () => api.failed_action();
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && S && S.stage !== "working") api.close();
+    if (e.key === "Enter" && S && S.stage === "install") $("i-go").click();
+  });
+  refresh();
+}
+function poll() {
+  const t = setInterval(async () => { await refresh(); if (S.stage !== "working") clearInterval(t); }, 300);
+}
+if (window.pywebview && window.pywebview.api && window.pywebview.api.status) init();
+else window.addEventListener("pywebviewready", init);
+</script>
+</body>
+</html>

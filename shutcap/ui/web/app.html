@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ShutCap</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { display: flex; flex-direction: column; }
+  .view { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .view.active { display: flex; }
+  .scroll { flex: 1; overflow-y: auto; padding: 0 20px 24px; }
+  .pad { padding: 0 24px; }
+
+  /* Setup */
+  .setup-head { padding: 6px 28px 0; }
+  .steps { display: flex; gap: 6px; margin-bottom: 14px; }
+  .steps i { width: 18px; height: 4px; border-radius: 4px; background: var(--fill-2); }
+  .steps i.on { background: var(--clay); }
+  .setup-head p { color: var(--ink-2); margin-top: 6px; max-width: 300px; }
+  .dial-wrap { flex: 1; display: grid; place-items: center; }
+  .dial { position: relative; width: 272px; height: 272px; touch-action: none; outline: none; border-radius: 50%; }
+  .dial svg { position: absolute; inset: 0; overflow: visible; }
+  .dial .face { fill: var(--surface); stroke: var(--line); }
+  .dial .tick { stroke: var(--ink-3); stroke-width: 1; opacity: .5; }
+  .dial .tick.major { stroke-width: 2; opacity: .9; }
+  .dial .lbl { fill: var(--ink-3); font: 600 11px var(--sans); text-anchor: middle; dominant-baseline: central; }
+  .dial .arc { stroke: var(--clay); stroke-width: 10; fill: none; stroke-linecap: round; opacity: .35; }
+  .dial .hand { stroke: var(--clay); stroke-width: 2; }
+  .dial .knob { fill: var(--clay); stroke: var(--surface); stroke-width: 4; cursor: grab; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
+  .dial:focus-visible .knob { stroke: var(--clay-soft); }
+  .dial .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+  .dial .big { font: 500 54px/1 var(--serif); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .dial .big span { pointer-events: auto; cursor: ns-resize; border-radius: 6px; padding: 0 2px; }
+  .dial .big span:hover { background: var(--fill); }
+  .dial .caption { margin-top: 6px; }
+  .setup-foot { padding: 0 24px 22px; display: flex; align-items: center; gap: 10px; }
+  .setup-foot .grow { flex: 1; }
+
+  .timeline { position: relative; display: flex; justify-content: space-between; margin: 18px 6px 4px; }
+  .timeline::before { content: ""; position: absolute; left: 10px; right: 10px; top: 32px; height: 2px; background: var(--fill-2); }
+  .timeline .pt { position: relative; text-align: center; width: 76px; }
+  .timeline .pt b { display: block; font: 500 20px var(--serif); font-variant-numeric: tabular-nums; }
+  .timeline .pt i { display: block; width: 12px; height: 12px; border-radius: 50%; margin: 7px auto 6px; background: var(--surface); box-shadow: 0 0 0 2px var(--clay); }
+  .timeline .pt:last-child i { background: var(--clay); }
+  .timeline .pt span { color: var(--ink-3); font-size: 11.5px; }
+
+  /* Home */
+  .home-body { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 4px 24px 22px; }
+  .home-body .ring { width: 268px; height: 268px; margin-top: 8px; }
+  .hero { font: 500 62px/1 var(--serif); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .hero.word { font-size: 52px; }
+  .ring .caption { margin-bottom: 8px; font-weight: 600; letter-spacing: .02em; }
+  .ring .sub { margin-top: 10px; color: var(--ink-2); }
+  .strip { display: flex; gap: 0; width: 100%; margin-top: 26px; background: var(--surface); border-radius: var(--r-md); box-shadow: 0 0 0 1px var(--line); }
+  .strip div { flex: 1; text-align: center; padding: 10px 4px; position: relative; }
+  .strip div + div::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 1px; background: var(--line); }
+  .strip b { display: block; font: 600 15px var(--display); font-variant-numeric: tabular-nums; }
+  .strip span { font-size: 11.5px; color: var(--ink-3); }
+  .home-action { margin-top: auto; padding-top: 16px; min-height: 52px; display: flex; align-items: flex-end; }
+
+  /* Pages (settings, history) */
+  .page-title { padding: 2px 24px 4px; }
+  .section-h.with-action { display: flex; justify-content: space-between; align-items: baseline; }
+  .section-h .link { font-size: 11.5px; padding: 0; }
+  .ntfy-row { display: none; }
+  .ntfy-row.show { display: flex; }
+  .ver { text-align: center; margin-top: 20px; }
+
+  .event-time { width: 44px; color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .empty { flex: 1; display: grid; place-content: center; text-align: center; gap: 6px; padding-bottom: 60px; }
+  .empty .serif { font-size: 22px; }
+</style>
+</head>
+<body>
+
+<!-- Shared title bar -->
+<div class="titlebar pywebview-drag-region" id="titlebar">
+  <button class="iconbtn" id="back" title="Back" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button>
+  <span class="badge clay" id="practice" hidden><span class="dot"></span>Practice</span>
+  <div class="grow pywebview-drag-region"></div>
+  <button class="iconbtn" id="go-history" title="History" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9"/><path d="M2.5 2.5v2.2h2.2"/><path d="M8 5v3l2 1.3"/></svg></button>
+  <button class="iconbtn" id="go-settings" title="Settings" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5 3.4 3.4"/></svg></button>
+  <button class="iconbtn" id="win-min" title="Minimize"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 8h8"/></svg></button>
+  <button class="iconbtn close" id="win-close" title="Close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></svg></button>
+</div>
+
+<!-- Setup 1: time dial -->
+<section class="view" id="v-setup1">
+  <div class="setup-head">
+    <div class="steps"><i class="on"></i><i></i></div>
+    <h1 class="title">Shutdown time</h1>
+    <p>ShutCap warns you first. It does not lock you out.</p>
+  </div>
+  <div class="dial-wrap">
+    <div class="dial" id="dial" tabindex="0" role="slider" aria-label="Shutdown time">
+      <svg viewBox="0 0 272 272" id="dial-svg"></svg>
+      <div class="center">
+        <div class="big"><span id="dial-h">23</span>:<span id="dial-m">15</span></div>
+        <div class="caption" id="dial-cap">Warnings from 22:30</div>
+      </div>
+    </div>
+  </div>
+  <div class="setup-foot">
+    <span class="caption">Drag, scroll or use the arrow keys.</span>
+    <div class="grow"></div>
+    <button class="btn primary" id="setup-next">Next</button>
+  </div>
+</section>
+
+<!-- Setup 2: schedule -->
+<section class="view" id="v-setup2">
+  <div class="setup-head">
+    <div class="steps"><i class="on"></i><i class="on"></i></div>
+    <h1 class="title">Your evening</h1>
+  </div>
+  <div class="scroll">
+    <div class="timeline" id="timeline"></div>
+    <div class="section-h">Times</div>
+    <div class="group" id="setup-rows"></div>
+    <p class="caption" style="margin:8px 4px 0">ShutCap adds a last warning and short reminders. Change them in Settings.</p>
+    <div class="section-h">Mode</div>
+    <div class="group">
+      <label class="row"><span class="label">Practice mode<small>Warnings only. The PC stays on.</small></span>
+        <span class="switch"><input type="checkbox" id="setup-practice" checked><span></span></span></label>
+    </div>
+  </div>
+  <div class="setup-foot">
+    <button class="link" id="setup-back">Back</button>
+    <div class="grow"></div>
+    <button class="btn primary" id="setup-finish">Finish</button>
+  </div>
+</section>
+
+<!-- Home -->
+<section class="view" id="v-home">
+  <div class="home-body">
+    <div class="ring" id="ring">
+      <svg viewBox="0 0 268 268"><circle class="track" cx="134" cy="134" r="124" fill="none" stroke-width="10"/><circle class="bar" id="ring-bar" cx="134" cy="134" r="124" fill="none" stroke-width="10"/></svg>
+      <div class="center">
+        <div class="caption" id="h-cap">Tonight</div>
+        <div class="hero" id="h-hero">--:--</div>
+        <div class="sub" id="h-sub">&nbsp;</div>
+      </div>
+    </div>
+    <div class="strip" id="strip">
+      <div><b id="s-warn">--:--</b><span>Warning</span></div>
+      <div><b id="s-curfew">--:--</b><span>Curfew</span></div>
+      <div><b id="s-off">--:--</b><span>Off</span></div>
+    </div>
+    <div class="home-action" id="h-action"></div>
+  </div>
+</section>
+
+<!-- Settings -->
+<section class="view" id="v-settings">
+  <div class="page-title"><h1 class="title">Settings</h1></div>
+  <div class="scroll">
+    <div class="section-h with-action">Schedule <button class="link" id="reset-times">Reset</button></div>
+    <div class="group" id="set-rows"></div>
+
+    <div class="section-h">Alerts</div>
+    <div class="group">
+      <label class="row"><span class="label">Sound</span><span class="switch"><input type="checkbox" data-set="sound_enabled"><span></span></span></label>
+      <label class="row"><span class="label">Phone alerts<small>Sends to the ntfy app</small></span><span class="switch"><input type="checkbox" data-set="ntfy_enabled" id="ntfy-on"><span></span></span></label>
+      <div class="row ntfy-row" id="ntfy-row"><span class="label">Topic</span><input class="field" style="width:180px" id="ntfy-topic" placeholder="my-secret-topic" spellcheck="false"></div>
+    </div>
+
+    <div class="section-h">General</div>
+    <div class="group">
+      <label class="row"><span class="label">Practice mode<small>Warnings only. The PC stays on.</small></span><span class="switch"><input type="checkbox" data-set="dry_run" id="set-practice"><span></span></span></label>
+      <label class="row"><span class="label">Start with Windows</span><span class="switch"><input type="checkbox" data-set="autostart"><span></span></span></label>
+    </div>
+
+    <div class="section-h">Try it</div>
+    <div class="group">
+      <div class="row button" id="try-warning"><span class="label">Show a warning</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg></div>
+      <div class="row button" id="try-curfew"><span class="label">Show the curfew</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg></div>
+    </div>
+    <p class="caption ver" id="ver"></p>
+  </div>
+</section>
+
+<!-- History -->
+<section class="view" id="v-history">
+  <div class="page-title" style="display:flex;align-items:center">
+    <h1 class="title" style="flex:1">History</h1>
+    <button class="link" id="export">Export</button>
+    <button class="link danger" id="clear" style="margin-left:12px">Clear</button>
+  </div>
+  <div class="scroll" id="history-list"></div>
+  <div class="empty" id="history-empty" hidden><div class="serif">No history yet.</div><div class="caption">Events show here after the first evening.</div></div>
+</section>
+
+<!-- Sheet -->
+<div class="scrim" id="scrim">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2 id="sheet-title"></h2>
+    <p id="sheet-body"></p>
+    <div class="actions"><button class="btn" id="sheet-cancel"></button><button class="btn danger" id="sheet-ok"></button></div>
+  </div>
+</div>
+<div class="toast" id="toast"><span id="toast-text"></span><button id="toast-action" hidden></button></div>
+
+<script src="app.js"></script>
+</body>
+</html>

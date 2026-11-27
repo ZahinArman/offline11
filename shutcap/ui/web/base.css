@@ -1,0 +1,211 @@
+/*
+  ShutCap design system. Every window (app, alerts, installer, uninstaller) uses this file.
+  Apple structure and controls; Anthropic colour and serif type.
+
+  Pop-up policy:
+  - Separate windows: evening alerts only (warning card, curfew, countdown pill).
+  - Confirms: a sheet inside the current window. Only for actions that turn the PC off or delete data.
+  - Success: no message. The UI shows the new state.
+  - Errors: next to the field that is wrong.
+*/
+
+:root {
+  --bg: #FAF9F5;
+  --surface: #FFFFFF;
+  --fill: #F0EEE6;
+  --fill-2: #E8E6DC;
+  --ink: #141413;
+  --ink-2: #5E5D59;
+  --ink-3: #6E6D67;
+  --line: rgba(20, 20, 19, .09);
+  --clay: #D97757;
+  --clay-ink: #9E4424;
+  --clay-soft: rgba(217, 119, 87, .14);
+  --danger: #C2402F;
+  --ok: #3F8A5C;
+  --shadow: 0 1px 2px rgba(20, 20, 19, .06), 0 8px 28px rgba(20, 20, 19, .10);
+  --scrim: rgba(20, 20, 19, .28);
+
+  --sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --serif: "Sitka Heading", "Sitka Display", "Sitka Text", "Sitka", Georgia, serif;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1F1E1D;
+    --surface: #2A2927;
+    --fill: #302F2C;
+    --fill-2: #3A3936;
+    --ink: #F5F4EE;
+    --ink-2: #B7B5AC;
+    --ink-3: #9C998F;
+    --line: rgba(255, 255, 255, .08);
+    --clay: #E08A6B;
+    --clay-ink: #EC9C7E;
+    --clay-soft: rgba(224, 138, 107, .16);
+    --danger: #F0705F;
+    --ok: #6DBB8A;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+    --scrim: rgba(0, 0, 0, .55);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; }
+[hidden] { display: none !important; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 13px/1.45 var(--sans); -webkit-font-smoothing: antialiased;
+  user-select: none; overflow: hidden;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+::selection { background: var(--clay-soft); }
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb { background: var(--fill-2); border-radius: 10px; border: 3px solid var(--bg); }
+
+/* ---- Type ------------------------------------------------------------------------- */
+.serif { font-family: var(--serif); font-weight: 500; letter-spacing: -.01em; }
+.title { font: 600 22px/1.15 var(--serif); letter-spacing: -.01em; }
+.subtle { color: var(--ink-2); }
+.caption { font-size: 11.5px; color: var(--ink-3); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- Title bar (frameless windows) -------------------------------------------------- */
+.titlebar {
+  height: 44px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 14px; flex: none;
+}
+.titlebar .grow { flex: 1; height: 100%; }
+.iconbtn {
+  width: 32px; height: 32px; border: 0; border-radius: var(--r-sm); background: transparent;
+  display: grid; place-items: center; color: var(--ink-2); cursor: default;
+  transition: background .15s, color .15s;
+}
+.iconbtn:hover { background: var(--fill); color: var(--ink); }
+.iconbtn:active { background: var(--fill-2); }
+.iconbtn svg { width: 16px; height: 16px; }
+.iconbtn.close:hover { background: #E5483A; color: #fff; }
+
+/* ---- Buttons ---------------------------------------------------------------------- */
+.btn {
+  height: 36px; padding: 0 18px; border-radius: var(--r-sm); border: 0; cursor: default;
+  font-weight: 600; font-size: 13px; background: var(--fill); color: var(--ink);
+  transition: background .15s, transform .1s, opacity .15s;
+}
+.btn:hover { background: var(--fill-2); }
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .4; pointer-events: none; }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.primary:hover { opacity: .88; }
+.btn.accent { background: var(--clay); color: #fff; }
+.btn.accent:hover { opacity: .9; }
+.btn.danger { background: var(--danger); color: #fff; }
+.btn.danger:hover { opacity: .9; }
+.btn.wide { width: 100%; height: 40px; }
+.link {
+  border: 0; background: none; padding: 4px 2px; color: var(--ink-2); font-weight: 500; cursor: default;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; transition: .15s;
+}
+.link:hover { color: var(--ink); text-decoration-color: currentColor; }
+.link.danger { color: var(--danger); }
+
+/* ---- Badge ------------------------------------------------------------------------ */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 99px;
+  background: var(--fill); color: var(--ink-2); font-size: 11.5px; font-weight: 600;
+}
+.badge.clay { background: var(--clay-soft); color: var(--clay-ink); }
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ---- Grouped list (Apple inset list) ---------------------------------------------- */
+.section-h { font-size: 11.5px; font-weight: 600; color: var(--ink-3); margin: 18px 4px 6px; }
+.group { background: var(--surface); border-radius: var(--r-md); box-shadow: 0 0 0 1px var(--line); overflow: hidden; }
+.row {
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 14px; position: relative;
+}
+.row + .row::before { content: ""; position: absolute; top: 0; left: 14px; right: 0; height: 1px; background: var(--line); }
+.row .label { flex: 1; min-width: 0; }
+.row .label small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.row.button { cursor: default; transition: background .15s; }
+.row.button:hover { background: var(--fill); }
+.row .chev { color: var(--ink-3); width: 14px; height: 14px; }
+.row.error .label { color: var(--danger); }
+.row .msg { position: absolute; right: 108px; color: var(--danger); font-size: 11.5px; }
+
+/* ---- Time field ------------------------------------------------------------------- */
+.time {
+  width: 76px; height: 30px; border-radius: 7px; border: 0; background: var(--fill); text-align: center;
+  font: 600 14px var(--display); font-variant-numeric: tabular-nums; outline: none; transition: box-shadow .15s;
+}
+.time:focus { box-shadow: 0 0 0 2px var(--clay); background: var(--surface); }
+.row.error .time { box-shadow: 0 0 0 2px var(--danger); }
+
+.field {
+  width: 100%; height: 34px; border-radius: var(--r-sm); border: 0; background: var(--fill); padding: 0 12px;
+  outline: none; user-select: text; transition: box-shadow .15s;
+}
+.field:focus { box-shadow: 0 0 0 2px var(--clay); background: var(--surface); }
+textarea.field { height: 84px; padding: 10px 12px; resize: none; line-height: 1.45; }
+
+/* ---- Toggle (Apple switch) -------------------------------------------------------- */
+.switch { position: relative; width: 40px; height: 24px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: default; z-index: 1; }
+.switch span {
+  position: absolute; inset: 0; border-radius: 99px; background: var(--fill-2); transition: background .2s var(--ease);
+}
+.switch span::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .25s var(--ease);
+}
+.switch input:checked + span { background: var(--clay); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { box-shadow: 0 0 0 3px var(--clay-soft); }
+
+/* ---- Sheet (in-window confirm) ---------------------------------------------------- */
+.scrim {
+  position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 52px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40;
+}
+.scrim.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  width: calc(100% - 48px); max-width: 340px; background: var(--surface); border-radius: var(--r-lg); padding: 22px;
+  box-shadow: var(--shadow); transform: translateY(-12px) scale(.98); transition: transform .25s var(--ease);
+}
+.scrim.open .sheet { transform: none; }
+.sheet h2 { font: 600 18px/1.25 var(--serif); margin-bottom: 6px; }
+.sheet p { color: var(--ink-2); margin-bottom: 18px; }
+.sheet .actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ---- Toast (in-window, never a separate window) ------------------------------------ */
+.toast {
+  position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 10px); opacity: 0;
+  background: var(--ink); color: var(--bg); border-radius: 99px; padding: 8px 14px; font-weight: 500;
+  display: flex; gap: 10px; align-items: center; transition: .25s var(--ease); z-index: 50; pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast button { border: 0; background: none; color: var(--clay); font-weight: 600; cursor: default; padding: 0; }
+
+/* ---- Ring ------------------------------------------------------------------------- */
+.ring { position: relative; display: grid; place-items: center; }
+.ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.ring .track { stroke: var(--fill); }
+.ring .bar { stroke: var(--clay); stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .3s; }
+.ring.off .bar { stroke: var(--ink-3); }
+.ring.urgent .bar { stroke: var(--danger); }
+.ring .center { text-align: center; position: relative; }
+
+/* ---- Motion ----------------------------------------------------------------------- */
+.fade-in { animation: fadeIn .35s var(--ease) both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

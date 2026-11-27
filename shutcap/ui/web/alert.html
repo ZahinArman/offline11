@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ShutCap alert</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { background: var(--surface); }
+  .card { padding: 18px 20px 18px; display: none; }
+  .card.active { display: block; animation: fadeIn .3s var(--ease) both; }
+  .app-line { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink-3); font-size: 11.5px; font-weight: 600; }
+  .app-line img { width: 16px; height: 16px; border-radius: 4px; }
+  .app-line .grow { flex: 1; }
+  .app-line .iconbtn { width: 24px; height: 24px; margin: -4px -6px -4px 0; }
+  .app-line .iconbtn svg { width: 13px; height: 13px; }
+  h1 { font: 600 22px/1.15 var(--serif); letter-spacing: -.01em; }
+  h1.big { font-size: 30px; }
+  p { color: var(--ink-2); margin-top: 4px; }
+  .foot { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  .foot .grow { flex: 1; }
+  .timer { height: 3px; border-radius: 3px; background: var(--fill); overflow: hidden; flex: 1; margin-right: 6px; }
+  .timer i { display: block; height: 100%; width: 100%; background: var(--ink-3); transform-origin: left; }
+  .card.urgent h1 { color: var(--clay-ink); }
+  .card.critical h1 { color: var(--danger); }
+
+  /* curfew */
+  #curfew { padding: 26px 26px 22px; }
+  #curfew h1 { font-size: 30px; margin-bottom: 4px; }
+  #curfew .foot { margin-top: 24px; }
+  #emergency { padding: 22px 26px; }
+  #emergency textarea { margin-top: 14px; }
+
+  /* countdown pill */
+  #pill { padding: 0; height: 100vh; }
+  #pill.active { display: flex; align-items: center; gap: 12px; padding: 0 10px 0 12px; }
+  #pill .ring { width: 44px; height: 44px; flex: none; }
+  #pill .ring svg { width: 44px; height: 44px; }
+  #pill .t { flex: 1; min-width: 0; }
+  #pill .t b { display: block; font: 600 22px/1 var(--display); font-variant-numeric: tabular-nums; }
+  #pill .t span { font-size: 11.5px; color: var(--ink-3); }
+  #pill.urgent .t b { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- Warning card (all warnings and reminders use this one layout) -->
+<section class="card" id="warning">
+  <div class="app-line pywebview-drag-region"><img src="icon.png" alt=""><span>ShutCap</span><span class="badge clay" id="w-badge" hidden>Test</span><span class="grow"></span>
+    <button class="iconbtn" data-close title="Close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></svg></button></div>
+  <h1 id="w-title"></h1>
+  <p id="w-body"></p>
+  <div class="foot"><div class="timer"><i id="w-timer"></i></div><button class="btn" data-close>OK</button></div>
+</section>
+
+<!-- Curfew -->
+<section class="card" id="curfew">
+  <div class="app-line pywebview-drag-region"><img src="icon.png" alt=""><span>ShutCap</span><span class="badge clay" id="c-badge" hidden>Preview</span></div>
+  <h1>Time to stop.</h1>
+  <p id="c-body"></p>
+  <div class="foot"><button class="link" id="c-emergency">I have an emergency</button><span class="grow"></span><button class="btn accent" id="c-ok">OK</button></div>
+</section>
+
+<!-- Emergency -->
+<section class="card" id="emergency">
+  <div class="app-line pywebview-drag-region"><img src="icon.png" alt=""><span>ShutCap</span><span class="badge clay" id="e-badge" hidden>Preview</span></div>
+  <h1>Emergency</h1>
+  <p>ShutCap saves this reason.</p>
+  <textarea class="field" id="e-reason" placeholder="Reason" maxlength="300"></textarea>
+  <div class="foot"><span class="grow"></span><button class="btn" id="e-back">Back</button><button class="btn danger" id="e-ok" disabled>Cancel tonight’s shutdown</button></div>
+</section>
+
+<!-- Countdown pill -->
+<section class="card pywebview-drag-region" id="pill">
+  <div class="ring" id="p-ring"><svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18" fill="none" stroke-width="5"/><circle class="bar" id="p-bar" cx="22" cy="22" r="18" fill="none" stroke-width="5"/></svg></div>
+  <div class="t pywebview-drag-region"><b id="p-time">0:00</b><span id="p-cap">Off in</span></div>
+  <button class="link" id="p-emergency">Emergency</button>
+</section>
+
+<!-- Shutdown failed -->
+<section class="card critical" id="failed">
+  <div class="app-line pywebview-drag-region"><img src="icon.png" alt=""><span>ShutCap</span></div>
+  <h1>The PC did not turn off</h1>
+  <p>Save your work and turn off the PC.</p>
+  <div class="foot"><span class="grow"></span><button class="btn" data-close>OK</button><button class="btn primary" id="f-retry">Try again</button></div>
+</section>
+
+<script src="alert.js"></script>
+</body>
+</html>

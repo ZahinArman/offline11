@@ -33,7 +33,7 @@ ShutCap is a gentle nudge, not a lock. It never locks you out of your PC.
 1. You choose the time at which the PC turns off.
 2. ShutCap calculates the warning times from that time.
 3. ShutCap shows two warnings before the curfew starts.
-4. At the curfew, ShutCap shows a dialog and a countdown.
+4. At the curfew, ShutCap shows the curfew window and a countdown.
 5. At the turn-off time, ShutCap runs `shutdown.exe /s /t 60`.
 6. Windows gives your apps 60 seconds, then the PC turns off.
 
@@ -43,80 +43,87 @@ ShutCap has no telemetry, no accounts, and no cloud service.
 
 ## Install
 
-Requirements: Windows 10 or Windows 11. You do not need administrator rights.
+Requirements: Windows 10 or Windows 11 with Microsoft Edge WebView2. Windows 11 includes WebView2. You do not need administrator rights.
 
 1. Open the [Releases](https://github.com/ZahinArman/shutcap/releases) page.
 2. Download `ShutCap-Setup.exe`.
 3. Double-click the file.
-4. Click **Yes**.
+4. To use a different folder, click **Change…** and select a folder.
+5. Click **Install**.
 
 The setup program does these tasks:
 
-- It installs ShutCap to `%LOCALAPPDATA%\Programs\ShutCap`.
+- It installs ShutCap to the folder that you choose. The default is `%LOCALAPPDATA%\Programs\ShutCap`. ShutCap always uses its own `ShutCap` folder. Setup does not install into a folder that has other files in it.
 - It adds Start Menu and Desktop shortcuts.
 - It adds **Uninstall ShutCap** to the Start Menu.
 - It adds ShutCap to Settings > Apps > Installed apps.
-- It sets ShutCap to start at sign-in, minimized to the tray.
+- If **Start with Windows** is on, it sets ShutCap to start at sign-in, minimized to the tray.
 - It starts ShutCap.
 
-To upgrade, run a newer setup file. The upgrade keeps your settings.
+To upgrade, run a newer setup file. The upgrade uses the same folder and keeps your settings.
 
 > **NOTE:** The setup file is not code-signed. Windows SmartScreen can show a warning. Click **More info**, then click **Run anyway**.
 
 ## First-time setup
 
-On the first start, ShutCap shows a setup window with two steps.
+On the first start, ShutCap shows two steps in its window.
 
-**Step 1.** The window asks: "When should your PC turn off each night?"
+**Step 1: Shutdown time.**
 
-1. Enter the hour and the minute. Use the 24-hour format.
-2. Click **NEXT**.
+1. Drag the dot around the dial to set the time. You can also use the mouse wheel or the arrow keys. Shift+arrow changes the hour.
+2. Click **Next**.
 
-**Step 2.** The window shows the other times. ShutCap calculates them from your turn-off time. You can edit each time.
+**Step 2: Your evening.** Step 2 shows three times. You can edit the first warning and the curfew.
 
 | Event | Default time |
 | --- | --- |
 | First warning | 45 minutes before turn-off |
-| Second warning | 25 minutes before turn-off |
-| Curfew starts (dialog and countdown) | 15 minutes before turn-off |
+| Curfew (curfew window and countdown) | 15 minutes before turn-off |
+| Off | Your chosen time |
+
+ShutCap adds the other alerts for you:
+
+| Event | Time |
+| --- | --- |
+| Last warning | 10 minutes before the curfew |
 | Reminder | 10 minutes before turn-off |
 | Reminder | 5 minutes before turn-off |
-| Last-minute warning | 1 minute before turn-off |
-| PC turns off | Your chosen time |
+| Last minute | 1 minute before turn-off |
 
-Step 2 also has the **Dry-run (practice) mode** check box. This box is on by default. In dry-run mode, ShutCap shows the warnings but does not turn off the PC.
+If the gaps are shorter, ShutCap spreads these alerts evenly. You can change all seven times later in Settings.
 
-Click **FINISH** to save the schedule. If you close the setup window, ShutCap keeps the default times.
+If a time is out of order, ShutCap marks that row in red and you cannot click **Finish**.
 
-You can change all times later in Settings. A schedule can cross midnight, for example turn-off at 00:30.
+Step 2 also has the **Practice mode** switch. It is on by default. In practice mode, ShutCap shows the warnings but does not turn off the PC.
+
+Click **Finish** to save the schedule. A schedule can cross midnight, for example turn-off at 00:30.
 
 ## Daily use
 
-ShutCap runs in the system tray. Open the dashboard from the tray icon.
+ShutCap runs in the system tray. Click the tray icon to open the window.
 
-The dashboard shows the status and the schedule for tonight. It has these buttons:
+The window shows tonight's shutdown time in a ring. The ring fills as the time comes near. Under the ring are the warning, curfew, and off times.
 
-- **TEST CURFEW**: shows the curfew dialog only. It does not start a shutdown.
-- **ABORT PENDING SHUTDOWN**: stops a shutdown that is in progress.
-- **RE-ARM CURFEW (RESET TO NORMAL)**: turns the schedule on again after an emergency or an abort.
+- The clock icon opens **History**.
+- The gear icon opens **Settings**.
+- The close button hides the window. ShutCap continues to run in the tray. To stop ShutCap, right-click the tray icon and click **Quit ShutCap**.
 
-ShutCap allows only one running copy. If you start it again, ShutCap shows a message and does not open a second copy.
+ShutCap allows only one running copy. If you start it again, the running copy opens its window.
 
 ## The curfew
 
-At the curfew start, ShutCap shows a topmost dialog. The text is "PC TIME IS OVER. Is there a genuine emergency?" The dialog has two buttons:
+ShutCap has a small number of alerts, and they all look the same:
 
-- **NO EMERGENCY**
-- **GENUINE EMERGENCY**
-
-If you ignore the dialog, the shutdown continues.
-
-A floating countdown window shows the time that remains.
+- **Warnings.** A small card shows at the top-right of the screen. It does not take the keyboard focus. It closes after 30 seconds.
+- **Curfew.** A window shows "Time to stop." and the turn-off time. Click **OK**. If you ignore the window, the shutdown continues.
+- **Countdown.** After the curfew, a small countdown shows at the top-right. The reminders do not open new windows. They play a sound and send a phone alert. The countdown turns red in the last minute.
 
 To cancel tonight, use one of these methods:
 
-1. **Emergency.** Click **GENUINE EMERGENCY**. Write a reason. Tick the confirmation box. ShutCap cancels tonight and writes the event to the audit log.
-2. **Abort.** Click **ABORT PENDING SHUTDOWN** on the dashboard. Confirm the question. ShutCap runs `shutdown /a` and writes the event to the audit log.
+1. **Emergency.** Click **I have an emergency** in the curfew window, or **Emergency** in the countdown. Write a reason. Click **Cancel tonight's shutdown**. ShutCap writes the reason to History.
+2. **Cancel.** In the ShutCap window, click **Cancel shutdown**. Confirm. ShutCap runs `shutdown /a` and writes the event to History.
+
+To turn the curfew on again after a cancel, click **Turn back on** in the ShutCap window.
 
 To stop a shutdown by hand:
 
@@ -124,14 +131,14 @@ To stop a shutdown by hand:
 2. Type `shutdown /a`.
 3. Press Enter.
 
-If Windows refuses the shutdown command, the status changes to `SHUTDOWN_FAILED`. ShutCap shows an error message.
+If Windows refuses the shutdown command, ShutCap shows "The PC did not turn off". Click **Try again**, or save your work and turn off the PC.
 
 ## Safety rules
 
 ShutCap follows these rules. The code in `shutcap/scheduler.py` and the test file `tests/test_no_lockout.py` enforce them.
 
 - ShutCap enforces the turn-off at most once each night.
-- If the PC starts, restarts, or wakes from sleep after the curfew started, ShutCap does nothing that night. It shows no dialog, no countdown, and no warning.
+- If the PC starts, restarts, or wakes from sleep after the curfew started, ShutCap does nothing that night. It shows no curfew, no countdown, and no warning.
 - ShutCap saves a heartbeat every 10 seconds. If the heartbeat is older than 60 seconds, ShutCap knows that the PC was off or asleep.
 - If you restart the app while the PC stays on, the countdown continues.
 - ShutCap shows no old pop-ups the next morning.
@@ -140,28 +147,31 @@ ShutCap follows these rules. The code in `shutcap/scheduler.py` and the test fil
 
 ## Settings
 
-Open Settings from the dashboard or the tray icon. ShutCap applies each change immediately.
+Open Settings from the gear icon or the tray menu. ShutCap saves each change immediately. There is no Save button.
 
 In Settings you can:
 
-- Change the turn-off time and all warning times.
-- Turn dry-run mode on or off.
-- Turn **Start ShutCap automatically when Windows boots** on or off.
-- Set up Android push notifications.
+- Change the turn-off time and all warning times. **Reset** sets the default times again.
+- Turn sound on or off.
+- Set up phone alerts.
+- Turn practice mode on or off. Before practice mode goes off, ShutCap asks you to confirm.
+- Turn **Start with Windows** on or off.
+- Show a test warning or the curfew window. The test does not change tonight.
 
 ## Notifications
 
 ShutCap uses these alerts:
 
-- Windows toast messages
+- The warning card, the curfew window, and the countdown
 - Warning sounds
-- Topmost warning pop-up windows
-- Optional Android push messages through [ntfy.sh](https://ntfy.sh)
+- Optional phone alerts through [ntfy.sh](https://ntfy.sh)
 
-To use Android push messages:
+ShutCap does not also show Windows toast messages for these alerts. You see one alert, not two.
 
-1. Install the ntfy app on your Android phone.
-2. In Settings, tick **Android Push (ntfy.sh topic)**.
+To use phone alerts:
+
+1. Install the ntfy app on your phone.
+2. In Settings, turn on **Phone alerts**.
 3. Enter a private topic name.
 4. In the ntfy app, subscribe to the same topic.
 
@@ -171,7 +181,7 @@ To use Android push messages:
 
 ShutCap keeps its files in `%LOCALAPPDATA%\ShutCap`:
 
-- `audit.log` records each warning, decision, emergency, abort, and shutdown. Use the **AUDIT LOG** button to read it and to export it.
+- `audit.log` records each warning, decision, emergency, abort, and shutdown. Open **History** to read it. Click **Export** to save it as a text file.
 - `app.log` is the application log.
 
 ## Uninstall
@@ -181,13 +191,13 @@ Use one of these methods:
 - Open Settings > Apps > Installed apps. Select **ShutCap**. Click **Uninstall**.
 - Open the Start Menu. Click **Uninstall ShutCap**.
 
-Click the one confirmation. The uninstaller removes these items:
+Click **Remove**. The uninstaller removes these items:
 
 - The program files
 - The Start Menu, Desktop, and taskbar-pin shortcuts
 - The sign-in startup entry
 - The Installed apps entry
-- All settings, state files, and logs in `%LOCALAPPDATA%\ShutCap`
+- All settings, state files, and logs in `%LOCALAPPDATA%\ShutCap`. To keep them, turn on **Keep my settings and history** before you click **Remove**.
 
 ## Run from source
 
@@ -228,7 +238,7 @@ Command-line options:
 Test mode lets you see a full night in about 60 seconds.
 
 1. Run `run_test_mode.bat`, or run `python shutcap\main.py --test-mode --debug`.
-2. Watch the warnings, the curfew dialog, and the countdown.
+2. Watch the warnings, the curfew window, and the countdown.
 
 Test mode plays your own schedule on a fast clock. It always uses dry-run mode. It uses a temporary state folder, so it never changes the real night.
 
@@ -238,7 +248,7 @@ The option `--accelerated 60` also uses a temporary state folder.
 
 The installer sets this up for you. To do it by hand, use one of these methods:
 
-- In Settings, tick **Start ShutCap automatically when Windows boots**.
+- In Settings, turn on **Start with Windows**.
 - Add a registry value in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
 For the registry method, use the value name `ShutCap`. Use this data, with the path to your file:
@@ -324,16 +334,13 @@ Application files in `shutcap/`:
 
 User interface files in `shutcap/ui/`:
 
-- `main_window.py` is the dashboard.
-- `setup_wizard.py` is the two-step first-run window.
-- `settings_dialog.py` is the Settings window.
-- `curfew_dialog.py` is the emergency question dialog.
-- `emergency_dialog.py` collects the emergency reason.
-- `countdown_widget.py` is the floating countdown window.
-- `warning_dialog.py` is the topmost warning pop-up.
-- `audit_dialog.py` is the audit log viewer.
+- `webapp.py` opens the windows and connects them to the scheduler.
+- `setup_window.py` is the window for the installer and the uninstaller.
 - `tray.py` is the tray icon and menu.
-- `theme.py` sets the colors and fonts.
+- `web/base.css` is the design system. All windows use it.
+- `web/app.html` and `web/app.js` are the main window: setup, home, Settings, and History.
+- `web/alert.html` and `web/alert.js` are the alerts: warning, curfew, emergency, countdown.
+- `web/setup.html` is the installer and uninstaller page.
 
 ## Limitations
 

@@ -48,6 +48,15 @@ DEFAULT_MINUTES_BEFORE_SHUTDOWN: Dict[str, int] = {
 }
 
 
+class ScheduleError(ValueError):
+    """A schedule problem that names the field the user must fix."""
+
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(message)
+        self.field = field
+        self.message = message
+
+
 @dataclass
 class Config:
     warning_1_time: str = "22:30"          # 10:30 PM: First warning
@@ -77,6 +86,40 @@ class Config:
             m = (base - before) % (24 * 60)
             result[field_name] = f"{m // 60:02d}:{m % 60:02d}"
         return result
+
+    @staticmethod
+    def derive_schedule(first_warning: str, curfew: str, shutdown: str) -> Dict[str, str]:
+        """
+        Full schedule from the three times that first-run setup shows.
+        The last warning and the reminders are placed between them automatically:
+        last warning 10 min before curfew, reminders 10, 5 and 1 min before shutdown,
+        or spread evenly when the gaps are shorter. Raises ScheduleError(field, message).
+        """
+        def minutes(s: str) -> int:
+            t = Config.parse_time_str(s)
+            return t.hour * 60 + t.minute
+
+        base = minutes(first_warning)
+        c = (minutes(curfew) - base) % (24 * 60)
+        o = (minutes(shutdown) - base) % (24 * 60)
+        if c < 2:
+            raise ScheduleError("curfew_time", "Must be 2 min after first warning.")
+        if c >= o:
+            raise ScheduleError("curfew_time", "Must be before Off.")
+        if o - c < 4:
+            raise ScheduleError("curfew_time", "Must be 4 min before Off.")
+        w2 = c - 10 if c - 10 > 0 else c // 2
+        if o - 10 > c:
+            r1, r2, fw = o - 10, o - 5, o - 1
+        else:
+            g = (o - c) / 4
+            r1, r2, fw = c + round(g), c + round(2 * g), c + round(3 * g)
+        offsets = {
+            "warning_1_time": 0, "warning_2_time": w2, "curfew_time": c,
+            "grace_reminder_1_time": r1, "grace_reminder_2_time": r2,
+            "final_warning_time": fw, "shutdown_time": o,
+        }
+        return {f: f"{((base + off) % 1440) // 60:02d}:{(base + off) % 60:02d}" for f, off in offsets.items()}
 
     @classmethod
     def parse_time_str(cls, time_str: str) -> time:

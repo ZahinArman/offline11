@@ -45,3 +45,5 @@ htmlcov/
 # Not part of the app (launch film / design work)
 launch-video/
 .impeccable/
+ui-review/
+.claude/

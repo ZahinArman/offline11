@@ -11,7 +11,6 @@ import logging
 import os
 import sys
 import tempfile
-import tkinter as tk
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -26,12 +25,11 @@ from shutcap.logger import AuditLogger, setup_app_logging
 from shutcap.notifications import NotificationManager
 from shutcap.scheduler import Scheduler
 from shutcap.shutdown import ShutdownManager
-from shutcap.single_instance import SingleInstance
+from shutcap.single_instance import SingleInstance, listen_for_show, signal_running_instance
 from shutcap.state import CurfewStatus, StateManager
 from shutcap.time_provider import RealTimeProvider, TimeProvider, VirtualTimeProvider
-from shutcap.ui.main_window import MainWindow
-from shutcap.ui.setup_wizard import SetupWizard
 from shutcap.ui.tray import SystemTray
+from shutcap.ui.webapp import Core, WebUI
 
 
 def parse_args() -> argparse.Namespace:
@@ -101,23 +99,16 @@ def main() -> None:
     logging.info(f"Starting {__app_name__} v{__version__}")
 
     # 2. Enforce single instance
-    single_instance = SingleInstance()
+    # Test mode and fast clocks run beside the real app, so they use their own lock.
+    simulated = args.test_mode or args.accelerated > 0
+    single_instance = SingleInstance("Local\\ShutCap_App_SingleInstance_Mutex_Sim") if simulated else SingleInstance()
+    if simulated:
+        single_instance.lock_file = single_instance.lock_file.with_name("app-sim.pid")
     if not single_instance.check_or_acquire():
-        logging.warning("Duplicate instance detected. Exiting.")
-        # If run interactively, show quick message box
-        if not args.minimized:
-            try:
-                root = tk.Tk()
-                root.withdraw()
-                from tkinter import messagebox
-                messagebox.showwarning(
-                    "Already Running",
-                    "ShutCap is already running in the background.\n"
-                    "Check the system tray icon near your taskbar clock.",
-                )
-                root.destroy()
-            except Exception:
-                pass
+        # No pop-up: the running copy opens its window instead.
+        logging.info("ShutCap is already running. Asking it to show its window.")
+        if not args.minimized and not simulated:
+            signal_running_instance()
         sys.exit(0)
 
     try:
@@ -130,7 +121,6 @@ def main() -> None:
 
         # 4. Clock and Time Provider
         time_provider: TimeProvider
-        simulated = args.test_mode or args.accelerated > 0
         if args.test_mode:
             config_mgr.config.dry_run = True  # never shut down for real in test mode
             time_provider = make_test_clock(config_mgr.config, datetime.now().astimezone())
@@ -169,70 +159,34 @@ def main() -> None:
             detect_resume=not simulated,
         )
 
-        # 6. Build GUI Dashboard (wires scheduler milestones, popups, and notification alerts)
-        main_window = MainWindow(
-            config_mgr=config_mgr,
-            state_mgr=state_mgr,
-            scheduler=scheduler,
-            audit_logger=audit_logger,
-            time_provider=time_provider,
-            notifications=notifications,
-        )
+        # 6. User interface (pywebview) and tray
+        core = Core(config_mgr, state_mgr, scheduler, audit_logger, time_provider, notifications, simulated)
 
-        # 8. Setup System Tray
-        def _show_gui() -> None:
-            main_window.after(0, main_window.show_from_tray)
+        def _status_text() -> str:
+            cfg = config_mgr.config
+            status = scheduler.tonight_status(time_provider.now())
+            if status in (CurfewStatus.EMERGENCY_EXCEPTION, CurfewStatus.SHUTDOWN_CANCELLED,
+                          CurfewStatus.SKIPPED, CurfewStatus.MISSED):
+                return "Off tonight"
+            text = f"Off at {cfg.shutdown_time}"
+            return f"{text} · Practice" if cfg.dry_run else text
 
-        def _open_settings() -> None:
-            main_window.after(0, lambda: (main_window.show_from_tray(), main_window._open_settings()))
-
-        def _open_audit() -> None:
-            main_window.after(0, lambda: (main_window.show_from_tray(), main_window._open_audit()))
-
-        def _exit_app() -> None:
-            audit_logger.log("APP_EXIT", "ShutCap was exited from the tray menu.", dt=time_provider.now())
-            main_window.after(0, main_window.destroy)
+        def _quit() -> None:
+            audit_logger.log("APP_EXIT", "ShutCap was closed from the tray menu.", dt=time_provider.now())
+            ui.quit()
 
         tray = SystemTray(
-            config_mgr=config_mgr,
-            state_mgr=state_mgr,
-            on_show_window=_show_gui,
-            on_open_settings=_open_settings,
-            on_open_audit=_open_audit,
-            on_exit_app=_exit_app,
+            status_text=_status_text,
+            on_open=lambda: ui.show_main(),
+            on_settings=lambda: ui.show_main("settings"),
+            on_history=lambda: ui.show_main("history"),
+            on_quit=_quit,
         )
+        ui = WebUI(core, start_hidden=args.minimized, on_quit=lambda: None)
+        if not simulated:
+            listen_for_show(lambda: ui.show_main())
         tray.start()
-
-        # Connect window hide callback to tray
-        main_window.on_hide_to_tray = lambda: None
-
-        # 9. Main Periodic Tick Loop (runs every 1000ms)
-        def _tick_loop() -> None:
-            try:
-                scheduler.tick()
-                main_window._update_display()
-            except Exception as e:
-                logging.error(f"Error during scheduler tick: {e}", exc_info=True)
-            finally:
-                main_window.after(1000, _tick_loop)
-
-        if not config_mgr.config.setup_complete and not simulated:
-            # First run: ask for the shutdown time before anything is scheduled.
-            main_window.withdraw()
-
-            def _setup_done(new_config: Config) -> None:
-                main_window._on_settings_saved(new_config)
-                main_window.show_from_tray()
-                main_window.after(200, _tick_loop)
-
-            SetupWizard(main_window, config_mgr, on_done=_setup_done)
-        else:
-            if args.minimized:
-                main_window.withdraw()
-            main_window.after(200, _tick_loop)
-
-        # Start GUI main loop
-        main_window.mainloop()
+        ui.run()
 
     finally:
         logging.info("ShutCap shutting down cleanly.")

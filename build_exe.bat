@@ -11,11 +11,13 @@ echo ============================================================
 echo [1/3] Building ShutCap application...
 "%PY%" -m PyInstaller --noconsole --onedir --name ShutCap --icon assets\icon.ico ^
     --add-data "assets\icon.png;assets" --add-data "assets\icon.ico;assets" ^
+    --add-data "shutcap\ui\web;shutcap\ui\web" ^
     --clean -y shutcap\main.py
 if errorlevel 1 goto :fail
 
 echo [2/3] Building uninstaller...
-"%PY%" -m PyInstaller --noconsole --onefile --name uninstall --icon assets\icon.ico -y uninstall.py
+"%PY%" -m PyInstaller --noconsole --onefile --name uninstall --icon assets\icon.ico ^
+    --add-data "shutcap\ui\web;web" -y uninstall.py
 if errorlevel 1 goto :fail
 
 echo [3/3] Building ShutCap-Setup.exe (bundles the app and uninstaller)...
@@ -23,6 +25,7 @@ echo [3/3] Building ShutCap-Setup.exe (bundles the app and uninstaller)...
     --add-data "dist\ShutCap;payload\ShutCap" ^
     --add-data "dist\uninstall.exe;payload" ^
     --add-data "assets\icon.ico;payload" ^
+    --add-data "shutcap\ui\web;web" ^
     -y install.py
 if errorlevel 1 goto :fail
 

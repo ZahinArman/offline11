@@ -141,8 +141,10 @@ class NotificationManager:
 
         threading.Thread(target=_send, daemon=True).start()
 
-    def notify(self, title: str, message: str, sound_type: str = "warning", long_duration: bool = False, push_priority: str = "default", push_tags: str = "clock") -> None:
-        """Unified dispatch for toast, sound, and push notification."""
-        self.send_toast(title, message, long_duration=long_duration)
+    def notify(self, title: str, message: str, sound_type: str = "warning", long_duration: bool = False, push_priority: str = "default", push_tags: str = "clock", toast: bool = True) -> None:
+        """Unified dispatch for toast, sound, and push notification.
+        The app passes toast=False when its own alert window shows, so the user sees one alert, not two."""
+        if toast:
+            self.send_toast(title, message, long_duration=long_duration)
         self.play_sound(sound_type=sound_type)
         self.send_push_notification(title, message, priority=push_priority, tags=push_tags)

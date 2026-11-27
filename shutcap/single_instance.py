@@ -80,3 +80,47 @@ class SingleInstance:
     @property
     def is_already_running(self) -> bool:
         return self._is_already_running
+
+
+# --- "Show the window" signal between instances -------------------------------------------
+# A second launch does not show a pop-up. It signals the running copy, which opens its window.
+SHOW_EVENT_NAME = "Local\\ShutCap_App_ShowWindow"
+
+
+def signal_running_instance() -> bool:
+    """Asks the running copy to show its window. Returns True if the signal was sent."""
+    if sys.platform != "win32":
+        return False
+    kernel32 = ctypes.windll.kernel32
+    kernel32.OpenEventW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel32.OpenEventW.restype = wintypes.HANDLE
+    handle = kernel32.OpenEventW(0x0002, False, SHOW_EVENT_NAME)  # EVENT_MODIFY_STATE
+    if not handle:
+        return False
+    try:
+        return bool(kernel32.SetEvent(handle))
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def listen_for_show(callback) -> None:
+    """Runs callback (on a daemon thread) each time another launch asks to show the window."""
+    if sys.platform != "win32":
+        return
+    import threading
+    kernel32 = ctypes.windll.kernel32
+    kernel32.CreateEventW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel32.CreateEventW.restype = wintypes.HANDLE
+    handle = kernel32.CreateEventW(None, False, False, SHOW_EVENT_NAME)  # auto-reset
+    if not handle:
+        return
+
+    def _wait() -> None:
+        while True:
+            if kernel32.WaitForSingleObject(handle, 0xFFFFFFFF) == 0:
+                try:
+                    callback()
+                except Exception as e:
+                    logging.debug(f"Show-window callback failed: {e}")
+
+    threading.Thread(target=_wait, daemon=True, name="shutcap-show-listener").start()
