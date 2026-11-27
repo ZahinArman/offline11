@@ -141,9 +141,7 @@ d:\11ofDeath\
 │   └── icon.png              # High-resolution application logo
 ├── install.py                # Standalone Windows application installer script
 ├── uninstall.py              # Standalone 1-click uninstaller script
-├── build_exe.bat             # Compiles standalone Windows executable suite with PyInstaller
-├── build_exe.ps1             # PowerShell script to compile standalone executable suite
-├── install_autostart.bat     # Helper script to enable auto-startup on Windows boot
+├── build_exe.bat             # Builds dist\OFFLINE11-Setup.exe with PyInstaller
 ├── run_test_mode.bat         # Safe 60-second accelerated simulation launcher
 └── requirements.txt          # Python dependencies
 ```
@@ -251,17 +249,11 @@ To start OFFLINE 11 automatically whenever you log into Windows:
 3. Check **"Start OFFLINE 11 automatically when Windows boots"**.
 4. Click **SAVE SETTINGS**.
 
-### Method B: Via Helper Script
-Double-click:
-```cmd
-install_autostart.bat
-```
-
-### Method C: Manual Windows Registry Entry
+### Method B: Manual Windows Registry Entry
 OFFLINE 11 uses the standard Windows startup registry key:
 - **Registry Key**: `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
 - **Value Name**: `OFFLINE 11`
-- **Value Data**: `"C:\path\to\OFFLINE11.exe"` (or `"pythonw.exe" "d:\11ofDeath\offline11\main.py"`)
+- **Value Data**: `"C:\path\to\OFFLINE11.exe" --minimized` (or `"pythonw.exe" "C:\path\to\offline11\main.py" --minimized`)
 
 ---
 
@@ -316,13 +308,10 @@ If you click `GENUINE EMERGENCY` on the curfew modal:
 
 ## Building the Installer
 
-Requires Python with the packages in `requirements.txt` (includes PyInstaller). Run either:
+Requires Python with the packages in `requirements.txt` (includes PyInstaller). Double-click or run:
 
 ```cmd
 build_exe.bat
-```
-```powershell
-.\build_exe.ps1
 ```
 
 The result is a single file, **`dist\OFFLINE11-Setup.exe`**, which carries the app and its uninstaller inside it. Upload that one file to a GitHub Release.
