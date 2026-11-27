@@ -38,3 +38,10 @@ $RECYCLE.BIN/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Local build environment (release.ps1)
+.venv/
+
+# Not part of the app (launch film / design work)
+launch-video/
+.impeccable/

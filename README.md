@@ -254,6 +254,32 @@ For the registry method, use the value name `ShutCap`. Use this data, with the p
 
 The script creates one file, `dist\ShutCap-Setup.exe`. The file contains the app and the uninstaller.
 
+## Publish a release
+
+Maintainers use one command to publish a release:
+
+```
+.\release.ps1 2.1.0 "What changed, in one line"
+```
+
+The script does these steps:
+
+1. It stops if the working tree has changes that are not committed.
+2. It sets the version in `shutcap\__init__.py` and `install.py`.
+3. It makes a build environment in `.venv` and runs the tests.
+4. It builds `dist\ShutCap-Setup.exe`.
+5. It runs `tools\scan-secrets.ps1`. If the scan finds a key, a token, an email address, or a personal path, the script stops.
+6. It commits, tags, and pushes the release.
+7. It makes the GitHub release and attaches `ShutCap-Setup.exe`.
+
+The file name is always `ShutCap-Setup.exe`. Thus this download link always gets the newest version:
+
+```
+https://github.com/ZahinArman/shutcap/releases/latest/download/ShutCap-Setup.exe
+```
+
+The script needs the GitHub CLI (`gh`). You must sign in to it first.
+
 ## Tests
 
 Run all tests with this command:
@@ -278,6 +304,8 @@ Top-level files:
 - `install.py` is the setup program for `ShutCap-Setup.exe`.
 - `uninstall.py` is the uninstaller.
 - `build_exe.bat` builds the installer.
+- `release.ps1` builds and publishes a release.
+- `tools/scan-secrets.ps1` checks for keys, tokens, and personal data before a release.
 - `run_test_mode.bat` starts test mode.
 - `requirements.txt` lists the Python packages.
 
