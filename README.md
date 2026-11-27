@@ -29,13 +29,13 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 2. [Schedule & Enforcement Timeline](#schedule--enforcement-timeline)
 3. [The Core Rules: Once Per Night, Never a Lockout](#the-core-rules-once-per-night-never-a-lockout)
 4. [Architecture & Code Structure](#architecture--code-structure)
-5. [Installation & Setup (1-Click Install & Uninstall)](#installation--setup)
+5. [Install & Uninstall](#installation--setup)
 6. [Running the Application](#running-the-application)
 7. [Safe Testing Modes](#safe-testing-modes)
 8. [Windows Auto-Startup Setup](#windows-auto-startup-setup)
 9. [Optional Android Push Notifications (ntfy.sh)](#optional-android-push-notifications-ntfysh)
 10. [Safety & Emergency Recovery Procedure](#safety--emergency-recovery-procedure)
-11. [Packaging as Windows Standalone Executable Suite](#packaging-as-windows-standalone-executable-suite)
+11. [Building the Installer](#building-the-installer)
 12. [Automated Verification & Test Suite](#automated-verification--test-suite)
 13. [Documented Limitations & Technical Trade-offs](#documented-limitations--technical-trade-offs)
 
@@ -43,8 +43,8 @@ Modern screen-time and focus tools have a fundamental flaw: **they are too polit
 
 ## Key Features & Design Philosophy
 
-- **1-Click Native Windows Installer (`install.exe`)**: Integrates cleanly into Windows (`%LOCALAPPDATA%\Programs\OFFLINE 11`), places a shortcut on your Desktop, and makes it searchable directly from the Windows Start Menu.
-- **1-Click Complete Uninstaller (`uninstall.exe`)**: Nukes every trace of the app (program files, shortcuts, startup registry entries, and user data/logs). Also integrated directly into Windows Settings > Installed Apps.
+- **One-File Installer (`OFFLINE11-Setup.exe`)**: Download, double-click, confirm. No admin rights, no zip to extract. Adds Start Menu and Desktop shortcuts, starts at sign-in, and appears in Settings > Apps.
+- **Clean Uninstall**: Uninstall from Settings > Apps (or the Start Menu) and every trace is removed: program files, shortcuts, startup entry, settings and logs.
 - **Customizable Schedule**: While 11:00 PM is the default curfew, every milestone time (warnings, curfew, reminders, and shutdown) can be freely customized in **Settings** to match your personal sleep schedule.
 - **Self-Discipline Engine**: Built for self-restraint, not gamification. No badges, no leveling up, no analytics, no remote telemetry.
 - **Dark Monochrome Aesthetic**: Restrained, high-contrast system utility aesthetic (`#121212` charcoal black palette) with zero distracting animations.
@@ -152,49 +152,41 @@ d:\11ofDeath\
 
 ## Installation & Setup
 
-### Option 1: Quick 1-Click Install (Pre-compiled Windows Application)
+### Install (recommended)
 
-No Python or terminal knowledge required:
+1. Download **`OFFLINE11-Setup.exe`** from the [GitHub Releases](https://github.com/ZahinArman/offline11/releases) page.
+2. Double-click it and click **Yes**.
 
-1. Download **`OFFLINE11-v1.0.0.zip`** from the [GitHub Releases](https://github.com/ZahinArman/offline11/releases) page.
-2. Extract the `.zip` archive.
-3. Double-click **`install.exe`**.
-4. You are done!
-   - **Searchable**: Press the Windows Key and type `OFFLINE 11` to launch it immediately.
-   - **Desktop Shortcut**: An icon is automatically placed on your Desktop.
-   - **Clean Installation**: Files are stored in `%LOCALAPPDATA%\Programs\OFFLINE 11` (the standard per-user application directory used by apps like VS Code and Chrome).
+That's it. OFFLINE 11 is installed for your Windows user (no admin rights needed), starts right away, and starts automatically every time you sign in. You'll find it in the Start Menu, on your Desktop, and as an icon near the clock.
 
-#### 🧹 Complete 1-Click Uninstaller (`uninstall.exe`)
-Need to remove the utility completely? We provide a built-in uninstaller that nukes every related file:
-- Run **`uninstall.exe`** from your downloaded folder.
-- **OR** Search **"Uninstall OFFLINE 11"** directly from your Windows Start Menu.
-- **OR** Go to **Windows Settings > Apps > Installed apps**, find **OFFLINE 11**, and click **Uninstall**.
+It starts in safe **Dry-Run** mode: everything works except the actual power-off. When you're happy with your schedule, untick Dry-Run in **Settings** to enable real shutdowns.
 
-The uninstaller will prompt for confirmation and then permanently wipe:
-- All program binaries and libraries
-- Desktop and Start Menu shortcuts
-- Windows startup registry entries
-- All local settings, state records, and audit logs (`%LOCALAPPDATA%\OFFLINE11`)
+To update, just run a newer `OFFLINE11-Setup.exe`. Your settings and history are kept.
+
+> Windows SmartScreen may warn about an unrecognized app because the installer isn't code-signed. Click **More info → Run anyway**.
+
+### Uninstall
+
+Use any of these:
+- **Settings > Apps > Installed apps** → **OFFLINE 11** → **Uninstall**
+- Start Menu → **Uninstall OFFLINE 11**
+
+After one confirmation, everything is removed:
+- Program files (`%LOCALAPPDATA%\Programs\OFFLINE 11`)
+- Start Menu, Desktop and pinned-taskbar shortcuts
+- The sign-in startup entry and the Installed apps entry
+- All settings, state and logs (`%LOCALAPPDATA%\OFFLINE11`)
 
 ---
 
-### Option 2: Running from Source (Python 3.10+)
+### Running from Source (Python 3.10+)
 
-1. Clone the repository:
-   ```cmd
-   git clone https://github.com/ZahinArman/offline11.git
-   cd offline11
-   ```
-2. Install dependencies:
-   ```cmd
-   pip install -r requirements.txt
-   ```
-3. Run the installer script or run directly:
-   ```cmd
-   python install.py   # requires a build first (see Packaging below)
-   # Or run directly:
-   python offline11\main.py
-   ```
+```cmd
+git clone https://github.com/ZahinArman/offline11.git
+cd offline11
+pip install -r requirements.txt
+python offline11\main.py
+```
 
 ---
 
@@ -322,25 +314,18 @@ If you click `GENUINE EMERGENCY` on the curfew modal:
 
 ---
 
-## Packaging as Windows Standalone Executable Suite
+## Building the Installer
 
-To compile OFFLINE 11 into standalone `.exe` binaries that do not require Python to run:
+Requires Python with the packages in `requirements.txt` (includes PyInstaller). Run either:
 
-### Batch Script:
-Double-click:
 ```cmd
 build_exe.bat
 ```
-
-### PowerShell:
 ```powershell
 .\build_exe.ps1
 ```
 
-The script automatically builds all 3 components into `dist/`:
-- **`dist\OFFLINE11\OFFLINE11.exe`**: Main standalone application and runtime libraries.
-- **`dist\install.exe`**: Standalone 1-click Windows installer.
-- **`dist\uninstall.exe`**: Standalone 1-click uninstaller.
+The result is a single file, **`dist\OFFLINE11-Setup.exe`**, which carries the app and its uninstaller inside it. Upload that one file to a GitHub Release.
 
 ---
 
