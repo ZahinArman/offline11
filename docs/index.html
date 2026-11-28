@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en" data-type="software">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShutCap 2.1.0: download and release notes</title>
+<meta name="description" content="ShutCap turns your Windows PC off once each night, at a time that you choose. It never locks you out. Free for Windows 10 and 11.">
+<meta name="page-type" content="software">
+<meta name="site-kind" content="software">
+<meta property="og:title" content="ShutCap 2.1.0">
+<meta property="og:description" content="Turn your PC off on time, once each night. It never locks you out.">
+<meta property="og:image" content="https://zahinarman.github.io/shutcap/media/shutcap-launch-poster.jpg">
+<meta property="og:type" content="website">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/png" href="media/icon.png">
+<link rel="preload" as="image" href="media/shutcap-launch-poster.jpg">
+<style>
+  /* Tokens: copied from shutcap/ui/web/base.css so the site matches the app. */
+  :root {
+    --bg: #FAF9F5; --surface: #FFFFFF; --fill: #F0EEE6; --fill-2: #E8E6DC;
+    --ink: #141413; --ink-2: #5E5D59; --ink-3: #6E6D67;
+    --line: rgba(20, 20, 19, .09);
+    --clay: #D97757; --clay-ink: #9E4424; --clay-soft: rgba(217, 119, 87, .14);
+    --on-clay: #141413;
+    --shadow: 0 1px 2px rgba(20, 20, 19, .06), 0 8px 28px rgba(20, 20, 19, .10);
+    --sans: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    --serif: "Sitka Heading", "Sitka Display", "Sitka Text", "Sitka", Georgia, serif;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    --col: 44rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1F1E1D; --surface: #2A2927; --fill: #302F2C; --fill-2: #3A3936;
+      --ink: #F5F4EE; --ink-2: #B7B5AC; --ink-3: #9C998F;
+      --line: rgba(255, 255, 255, .08);
+      --clay: #E08A6B; --clay-ink: #EC9C7E; --clay-soft: rgba(224, 138, 107, .16);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 24px; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 400 1rem/1.6 var(--sans); -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: var(--clay-soft); color: var(--ink); }
+  ::-webkit-scrollbar { width: 12px; }
+  ::-webkit-scrollbar-thumb { background: var(--fill-2); border-radius: 12px; border: 3px solid var(--bg); }
+  html { scrollbar-color: var(--fill-2) var(--bg); caret-color: var(--clay); }
+  :focus { outline: none; }
+  :focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; border-radius: 4px; }
+  img, video { display: block; max-width: 100%; }
+  svg { flex: none; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px;
+      text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+      transition: text-decoration-color .2s, color .2s; }
+  a:hover { text-decoration-color: currentColor; }
+
+  .skip { position: absolute; left: 16px; top: -60px; background: var(--ink); color: var(--bg);
+          padding: 8px 14px; border-radius: var(--r-sm); text-decoration: none; z-index: 2; }
+  .skip:focus { top: 16px; }
+
+  .page { width: min(100% - 48px, var(--col)); margin-inline: auto; }
+
+  /* Nav */
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+           font: 600 1.125rem/1 var(--serif); letter-spacing: -.01em; }
+  .brand img { width: 28px; height: 28px; border-radius: 7px; }
+  .navlink { display: inline-flex; align-items: center; gap: 8px; font-size: .9375rem; color: var(--ink-2);
+             text-decoration: none; padding: 8px 10px; margin-right: -10px; border-radius: var(--r-sm);
+             transition: background .15s, color .15s; }
+  .navlink:hover { background: var(--fill); color: var(--ink); }
+  .navlink svg { width: 18px; height: 18px; }
+
+  /* Head */
+  .head { padding: 56px 0 32px; }
+  h1 { font: 600 clamp(2.5rem, 6vw, 3.5rem)/1.05 var(--serif); letter-spacing: -.02em; text-wrap: balance; }
+  h1 .ver { color: var(--ink-3); font-weight: 500; }
+  .lead { margin-top: 16px; font-size: 1.1875rem; line-height: 1.5; color: var(--ink-2); max-width: 34em; text-wrap: pretty; }
+  .act { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 28px; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 22px;
+         border-radius: var(--r-sm); text-decoration: none; font-weight: 600; font-size: 1rem;
+         background: var(--clay); color: var(--on-clay);
+         box-shadow: 0 1px 2px rgba(20,20,19,.14), 0 2px 8px rgba(20,20,19,.10);
+         transition: transform .18s var(--ease), box-shadow .18s var(--ease), background .18s; }
+  .btn svg { width: 18px; height: 18px; transition: transform .25s var(--ease); }
+  .btn:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--clay) 92%, var(--ink));
+               box-shadow: 0 2px 4px rgba(20,20,19,.14), 0 8px 18px rgba(20,20,19,.14); }
+  .btn:hover svg { transform: translateY(2px); }
+  .btn:active { transform: translateY(0) scale(.98); }
+  .meta { font-size: .875rem; color: var(--ink-3); line-height: 1.5; }
+  .meta span + span::before { content: "·"; margin: 0 8px; color: var(--ink-3); }
+
+  /* Film */
+  .film { margin: 8px 0 0; border-radius: var(--r-lg); overflow: hidden; background: #1F1E1D;
+          box-shadow: var(--shadow); aspect-ratio: 16 / 9; }
+  .film video { width: 100%; height: 100%; object-fit: cover; }
+  .film-note { margin-top: 12px; }
+
+  /* Sections */
+  section { padding-top: 64px; }
+  h2 { font: 600 1.75rem/1.2 var(--serif); letter-spacing: -.01em; margin-bottom: 20px; text-wrap: balance; }
+  p + p { margin-top: 12px; }
+  .muted { color: var(--ink-2); }
+
+  /* Must read: two numbered notes on one surface */
+  .notes { list-style: none; background: var(--surface); border-radius: var(--r-md);
+           box-shadow: 0 0 0 1px var(--line); counter-reset: n; }
+  .notes li { display: grid; grid-template-columns: 28px 1fr; gap: 14px; padding: 20px 22px; counter-increment: n; }
+  .notes li + li { border-top: 1px solid var(--line); }
+  .notes li::before { content: counter(n); width: 28px; height: 28px; border-radius: 50%;
+                      display: grid; place-items: center; font-weight: 600; font-size: .875rem;
+                      background: var(--clay-soft); color: var(--clay-ink); }
+  .notes strong { display: block; font-weight: 600; margin-bottom: 2px; }
+  .notes p { color: var(--ink-2); }
+  kbd { font: inherit; font-weight: 600; color: var(--ink); }
+
+  /* What is new */
+  .new { list-style: none; display: grid; gap: 18px; }
+  .new li { display: grid; grid-template-columns: 22px 1fr; gap: 14px; }
+  .new svg { width: 22px; height: 22px; margin-top: 2px; color: var(--clay); }
+  .new strong { font-weight: 600; }
+  .new p { color: var(--ink-2); margin: 0; }
+
+  /* Evening: the four default times */
+  .evening { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 8px; position: relative; }
+  .evening::before { content: ""; position: absolute; left: 6px; right: calc(25% - 6px); top: 6px; height: 2px;
+                     background: linear-gradient(90deg, var(--fill-2), var(--clay)); border-radius: 2px; }
+  .evening div { position: relative; padding-top: 26px; padding-right: 12px; }
+  .evening div::before { content: ""; position: absolute; left: 0; top: 0; width: 14px; height: 14px; border-radius: 50%;
+                         background: var(--bg); box-shadow: inset 0 0 0 2px var(--ink-3); }
+  .evening div:last-child::before { background: var(--clay); box-shadow: none; }
+  .evening dt { font-weight: 600; }
+  .evening dd { font-size: .9375rem; color: var(--ink-2); }
+
+  /* Folded detail */
+  details { border-top: 1px solid var(--line); }
+  details:last-of-type { border-bottom: 1px solid var(--line); }
+  .folds { margin-top: 28px; }
+  summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; padding: 16px 0; font-weight: 600; transition: color .15s; }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { color: var(--clay-ink); }
+  summary svg { width: 18px; height: 18px; color: var(--ink-3); transition: transform .3s var(--ease); }
+  details[open] summary svg { transform: rotate(180deg); }
+  .fold { padding: 0 0 24px; color: var(--ink-2); }
+  .fold ul { padding-left: 1.2em; display: grid; gap: 8px; }
+  .fold li::marker { color: var(--ink-3); }
+  .fold h3 { font-size: 1rem; font-weight: 600; color: var(--ink); margin: 20px 0 8px; }
+  .fold h3:first-child { margin-top: 0; }
+  details[open] .fold { animation: open .35s var(--ease); }
+  @keyframes open { from { opacity: 0; transform: translateY(-4px); } }
+
+  /* Earlier versions */
+  .versions { list-style: none; }
+  .versions li { display: grid; grid-template-columns: 5.5rem 1fr auto; gap: 16px; align-items: baseline;
+                 padding: 14px 0; border-top: 1px solid var(--line); }
+  .versions li:last-child { border-bottom: 1px solid var(--line); }
+  .versions .v { font-weight: 600; }
+  .versions .d { font-size: .875rem; color: var(--ink-3); white-space: nowrap; }
+  .versions p { color: var(--ink-2); }
+
+  footer { margin-top: 96px; padding: 28px 0 48px; border-top: 1px solid var(--line);
+           display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; font-size: .875rem; color: var(--ink-3); }
+  footer a { color: var(--ink-2); }
+
+  @media (max-width: 600px) {
+    .page { width: min(100% - 40px, var(--col)); }
+    .head { padding-top: 32px; }
+    .lead { font-size: 1.0625rem; }
+    .btn { width: 100%; justify-content: center; }
+    .film { border-radius: var(--r-md); margin-inline: -4px; }
+    section { padding-top: 52px; }
+    .evening { grid-template-columns: 1fr; gap: 18px; padding-left: 28px; }
+    .evening::before { left: 6px; right: auto; top: 6px; bottom: 6px; width: 2px; height: auto;
+                       background: linear-gradient(180deg, var(--fill-2), var(--clay)); }
+    .evening div { padding: 0; }
+    .evening div::before { left: -28px; top: 4px; }
+    .versions li { grid-template-columns: 1fr auto; gap: 2px 16px; }
+    .versions p { grid-column: 1 / -1; grid-row: 2; }
+    .versions .d { grid-column: 2; grid-row: 1; }
+    .notes li { padding: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the release notes</a>
+
+<div class="page">
+  <header class="nav">
+    <a class="brand" href="./" aria-label="ShutCap home"><img src="media/icon.png" alt="" width="28" height="28">ShutCap</a>
+    <a class="navlink" href="https://github.com/ZahinArman/shutcap">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      Source on GitHub
+    </a>
+  </header>
+
+  <main id="main">
+    <div class="head">
+      <h1>ShutCap <span class="ver num">2.1.0</span></h1>
+      <p class="lead">ShutCap turns your Windows PC off once each night, at a time that you choose. It never locks you out.</p>
+      <div class="act">
+        <a class="btn" href="https://github.com/ZahinArman/shutcap/releases/latest/download/ShutCap-Setup.exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+          Download for Windows
+        </a>
+        <p class="meta"><span class="num">46 MB</span><span>Windows 10 and 11</span><span>Free</span></p>
+      </div>
+    </div>
+
+    <figure class="film">
+      <video controls playsinline preload="none" poster="media/shutcap-launch-poster.jpg" width="1920" height="1080"
+             aria-label="ShutCap launch film, 47 seconds">
+        <source src="media/shutcap-launch.mp4" type="video/mp4">
+        <track kind="captions" src="media/shutcap-launch.en.vtt" srclang="en" label="English">
+        <a href="media/shutcap-launch.mp4">Watch the launch film (MP4, 12 MB)</a>
+      </video>
+    </figure>
+
+    <section aria-labelledby="h-read">
+      <h2 id="h-read">Before you install</h2>
+      <ol class="notes">
+        <li>
+          <div>
+            <strong>Windows can show a warning.</strong>
+            <p>The setup file is not code-signed, so SmartScreen can stop it. Click <kbd>More info</kbd>, then click <kbd>Run anyway</kbd>.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <strong>Practice mode is on at first.</strong>
+            <p>ShutCap shows all warnings, but it does not turn off the PC. When you are ready, open <kbd>Settings</kbd> and turn off <kbd>Practice mode</kbd>.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="h-new">
+      <h2 id="h-new">What is new in 2.1.0</h2>
+      <ul class="new">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18"/></svg>
+          <p><strong>One new design.</strong> All windows look the same. They follow the light or dark mode of Windows.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <p><strong>Fewer pop-ups.</strong> Approximately 30 pop-ups are now 3 alerts: a warning card, the curfew window, and a small countdown.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <p><strong>Faster setup.</strong> Set the time on a dial. Then make sure that the three evening times are correct.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-7.9a1 1 0 0 1-.8-.4L10.2 5a1 1 0 0 0-.8-.4H4a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1Z"/></svg>
+          <p><strong>Choose the install folder.</strong> Setup always makes its own ShutCap folder in the place that you choose.</p>
+        </li>
+      </ul>
+
+      <div class="folds">
+        <details>
+          <summary>How a ShutCap evening works
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold">
+            <p>These are the default times. You can change each time in Settings.</p>
+            <dl class="evening" style="margin-top:20px">
+              <div><dt>45 min before</dt><dd>First warning</dd></div>
+              <div><dt>25 min before</dt><dd>Last warning</dd></div>
+              <div><dt>15 min before</dt><dd>Curfew and countdown</dd></div>
+              <div><dt>Your time</dt><dd>Windows gives apps 60 seconds, then turns off</dd></div>
+            </dl>
+            <p style="margin-top:24px">If you have a real emergency, write the reason. ShutCap cancels tonight and keeps a note. ShutCap turns off the PC one time each night only.</p>
+          </div>
+        </details>
+        <details>
+          <summary>All changes in 2.1.0
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold">
+            <h3>Alerts</h3>
+            <ul>
+              <li>Reminders only play a sound. If phone alerts are on, they also send a push notification.</li>
+              <li>Confirmations open in the same window. ShutCap asks only before it turns off the PC or deletes data.</li>
+              <li>When you save, ShutCap shows the new state. It does not show a message.</li>
+              <li>Errors show next to the field that is wrong.</li>
+            </ul>
+            <h3>App</h3>
+            <ul>
+              <li>Settings and History are in the main window.</li>
+              <li>If ShutCap is already open, a second start shows the open window.</li>
+              <li>Text is sharp on high-resolution screens. Windows 11 shows rounded corners.</li>
+              <li>Test mode runs next to the real app.</li>
+            </ul>
+            <h3>Install and uninstall</h3>
+            <ul>
+              <li>Setup does not install into a folder that has other files in it.</li>
+              <li>The uninstaller finds the real install folder. It can keep your settings.</li>
+              <li>ShutCap now needs Microsoft Edge WebView2. Windows 11 has it. On Windows 10, <a href="https://developer.microsoft.com/microsoft-edge/webview2/">get WebView2 from Microsoft</a>.</li>
+            </ul>
+            <h3>Uninstall</h3>
+            <ul>
+              <li>Open Settings &gt; Apps &gt; Installed apps. Select ShutCap. Click Uninstall.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-old">
+      <h2 id="h-old">Earlier versions</h2>
+      <ul class="versions">
+        <li><a class="v num" href="https://github.com/ZahinArman/shutcap/releases/tag/v2.0.0">2.0.0</a><p>New name, ShutCap. First-time setup.</p><span class="d num">27 Nov 2026</span></li>
+        <li><a class="v num" href="https://github.com/ZahinArman/shutcap/releases/tag/v1.1.0">1.1.0</a><p>As OFFLINE 11. One shutdown each night at most.</p><span class="d num">27 Nov 2026</span></li>
+        <li><a class="v num" href="https://github.com/ZahinArman/shutcap/releases/tag/v1.0.0">1.0.0</a><p>As OFFLINE 11. First release.</p><span class="d num">13 Oct 2026</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <span>ShutCap 2.1.0 · Released 27 November 2026 · <a href="https://github.com/ZahinArman/shutcap/blob/main/LICENSE">MIT licence</a></span>
+    <span>No account. No tracking.</span>
+  </footer>
+</div>
+</body>
+</html>
