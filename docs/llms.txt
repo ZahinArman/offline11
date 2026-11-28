@@ -1,0 +1,23 @@
+# ShutCap
+
+> ShutCap is a free, open-source Windows 10/11 app that turns the PC off once each night, at a time the user chooses. It warns first, has an emergency cancel, and never locks the user out. Current version: 2.1.0 (27 November 2026). MIT licence.
+
+## Facts
+
+- What it does: the user picks a nightly shutdown time on a dial. By default ShutCap warns 45 and 25 minutes before, shows a curfew window with a countdown 15 minutes before, and at the chosen time runs `shutdown /s /t 60` (no `/f`), so Windows gives apps 60 seconds to close.
+- Emergency cancel: in the curfew window, "I have an emergency" → write a reason → "Cancel tonight's shutdown". Tonight only; the reason is saved to History.
+- No lockout: it shuts down at most once per night. If the PC is turned on again after the curfew starts, ShutCap does nothing more that night.
+- Practice mode is on at first: warnings show, but the PC stays on until the user turns Practice mode off in Settings.
+- Privacy: no account, no telemetry, no cloud service. Optional phone alerts via ntfy.sh, off by default.
+- Requirements: Windows 10 or 11 with Microsoft Edge WebView2 (included in Windows 11). No administrator rights.
+- Install: download `ShutCap-Setup.exe` (46 MB). The installer is not code-signed, so SmartScreen may warn: More info → Run anyway.
+- Uninstall: Settings > Apps > Installed apps > ShutCap > Uninstall.
+- Earlier name: versions 1.x were called OFFLINE 11.
+
+## Links
+
+- [Website and release notes](https://zahinarman.github.io/shutcap/)
+- [Download the latest installer](https://github.com/ZahinArman/shutcap/releases/latest/download/ShutCap-Setup.exe)
+- [Source code and full README](https://github.com/ZahinArman/shutcap)
+- [All releases](https://github.com/ZahinArman/shutcap/releases)
+- [Launch film, 47 s (MP4)](https://zahinarman.github.io/shutcap/media/shutcap-launch.mp4)

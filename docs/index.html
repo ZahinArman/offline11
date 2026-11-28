@@ -6,6 +6,7 @@
 <title>ShutCap: free bedtime shutdown timer for Windows</title>
 <meta name="description" content="ShutCap turns your Windows PC off once each night, at a time that you choose. Warnings first, an emergency cancel, and it never locks you out. Free for Windows 10 and 11.">
 <link rel="canonical" href="https://zahinarman.github.io/shutcap/">
+<link rel="alternate" type="text/markdown" href="https://zahinarman.github.io/shutcap/llms.txt" title="ShutCap summary for AI assistants">
 <meta name="google-site-verification" content="s1zYxBRzw0vXcvRviMJhURdR8H2XuVeXx3VDpRZ4h54">
 <meta name="robots" content="index, follow, max-image-preview:large, max-video-preview:-1">
 <meta name="page-type" content="software">
@@ -50,7 +51,11 @@
       "screenshot": "https://zahinarman.github.io/shutcap/media/shutcap-launch-poster.jpg",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "sameAs": ["https://github.com/ZahinArman/shutcap"],
-      "subjectOf": { "@id": "https://zahinarman.github.io/shutcap/#film" }
+      "dateModified": "2026-11-28",
+      "author": { "@id": "https://zahinarman.github.io/shutcap/#author" },
+      "publisher": { "@id": "https://zahinarman.github.io/shutcap/#author" },
+      "featureList": ["Daily shutdown at a time you choose", "Warnings 45 and 25 minutes before", "Curfew window and countdown", "Emergency cancel with a written reason", "Shuts down at most once each night", "Practice mode", "Follows Windows light and dark mode"],
+      "subjectOf": [{ "@id": "https://zahinarman.github.io/shutcap/#film" }, { "@id": "https://zahinarman.github.io/shutcap/#faq" }]
     },
     {
       "@type": "VideoObject",
@@ -63,6 +68,82 @@
       "contentUrl": "https://zahinarman.github.io/shutcap/media/shutcap-launch.mp4",
       "embedUrl": "https://zahinarman.github.io/shutcap/",
       "inLanguage": "en"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://zahinarman.github.io/shutcap/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is ShutCap?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ShutCap is a free Windows app that turns your PC off once each night, at a time that you choose. It shows warnings before the shutdown, and it never locks you out."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I make my Windows PC shut down automatically at night?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Install ShutCap and set your shutdown time on the dial. By default, ShutCap warns you 45 minutes and 25 minutes before. 15 minutes before, it shows the curfew window and a countdown. At your time, Windows turns off the PC."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does ShutCap force my apps to close?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. ShutCap runs the Windows command shutdown /s /t 60, without /f. Windows gives your apps 60 seconds to close. ShutCap does not force them to close."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I cancel tonight's shutdown?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. In the curfew window, click I have an emergency, write a reason, and click Cancel tonight's shutdown. ShutCap cancels tonight only and writes the reason to History. You can also click Cancel shutdown in the ShutCap window."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Will ShutCap lock me out of my PC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. ShutCap turns off the PC one time each night at most. If you turn the PC on again after the curfew starts, ShutCap does nothing more that night."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is ShutCap free, and does it collect data?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ShutCap is free and open source, with the MIT licence. It has no account, no telemetry, and no cloud service. Phone alerts through ntfy.sh are optional and off by default."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What do I need to run ShutCap?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You need Windows 10 or Windows 11 and Microsoft Edge WebView2. Windows 11 includes WebView2. You do not need administrator rights."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I uninstall ShutCap?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Open Settings > Apps > Installed apps, select ShutCap, and click Uninstall. The uninstaller removes the app, its shortcuts, and its start-up entry. It can keep your settings."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "Person",
+      "@id": "https://zahinarman.github.io/shutcap/#author",
+      "name": "ZahinArman",
+      "url": "https://github.com/ZahinArman"
     }
   ]
 }
@@ -212,6 +293,10 @@
   .fold h3:first-child { margin-top: 0; }
   details[open] .fold { animation: open .35s var(--ease); }
   @keyframes open { from { opacity: 0; transform: translateY(-4px); } }
+
+  /* Questions */
+  summary h3 { font: inherit; }
+  .faq .fold p { max-width: 38em; }
 
   /* Earlier versions */
   .versions { list-style: none; }
@@ -367,6 +452,60 @@
               <li>Open Settings &gt; Apps &gt; Installed apps. Select ShutCap. Click Uninstall.</li>
             </ul>
           </div>
+        </details>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-faq">
+      <h2 id="h-faq">Questions</h2>
+      <div class="faq">
+        <details>
+          <summary><h3>What is ShutCap?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>ShutCap is a free Windows app that turns your PC off once each night, at a time that you choose. It shows warnings before the shutdown, and it never locks you out.</p></div>
+        </details>
+        <details>
+          <summary><h3>How do I make my Windows PC shut down automatically at night?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>Install ShutCap and set your shutdown time on the dial. By default, ShutCap warns you 45 minutes and 25 minutes before. 15 minutes before, it shows the curfew window and a countdown. At your time, Windows turns off the PC.</p></div>
+        </details>
+        <details>
+          <summary><h3>Does ShutCap force my apps to close?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>No. ShutCap runs the Windows command shutdown /s /t 60, without /f. Windows gives your apps 60 seconds to close. ShutCap does not force them to close.</p></div>
+        </details>
+        <details>
+          <summary><h3>Can I cancel tonight&#x27;s shutdown?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>Yes. In the curfew window, click I have an emergency, write a reason, and click Cancel tonight&#x27;s shutdown. ShutCap cancels tonight only and writes the reason to History. You can also click Cancel shutdown in the ShutCap window.</p></div>
+        </details>
+        <details>
+          <summary><h3>Will ShutCap lock me out of my PC?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>No. ShutCap turns off the PC one time each night at most. If you turn the PC on again after the curfew starts, ShutCap does nothing more that night.</p></div>
+        </details>
+        <details>
+          <summary><h3>Is ShutCap free, and does it collect data?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>ShutCap is free and open source, with the MIT licence. It has no account, no telemetry, and no cloud service. Phone alerts through ntfy.sh are optional and off by default.</p></div>
+        </details>
+        <details>
+          <summary><h3>What do I need to run ShutCap?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>You need Windows 10 or Windows 11 and Microsoft Edge WebView2. Windows 11 includes WebView2. You do not need administrator rights.</p></div>
+        </details>
+        <details>
+          <summary><h3>How do I uninstall ShutCap?</h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="fold"><p>Open Settings &gt; Apps &gt; Installed apps, select ShutCap, and click Uninstall. The uninstaller removes the app, its shortcuts, and its start-up entry. It can keep your settings.</p></div>
         </details>
       </div>
     </section>
