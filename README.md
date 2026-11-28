@@ -8,6 +8,10 @@ ShutCap is a small Windows tray utility that turns the PC off once each night, a
 
 ShutCap is a gentle nudge, not a lock. It never locks you out of your PC.
 
+**Website:** [zahinarman.github.io/shutcap](https://zahinarman.github.io/shutcap/). Watch the launch film and download the newest version.
+
+[![Watch the ShutCap launch film](docs/media/shutcap-launch-poster.jpg)](https://zahinarman.github.io/shutcap/)
+
 ## Contents
 
 - [How it works](#how-it-works)
@@ -45,7 +49,7 @@ ShutCap has no telemetry, no accounts, and no cloud service.
 
 Requirements: Windows 10 or Windows 11 with Microsoft Edge WebView2. Windows 11 includes WebView2. You do not need administrator rights.
 
-1. Open the [Releases](https://github.com/ZahinArman/shutcap/releases) page.
+1. Open the [ShutCap website](https://zahinarman.github.io/shutcap/) or the [Releases](https://github.com/ZahinArman/shutcap/releases) page.
 2. Download `ShutCap-Setup.exe`.
 3. Double-click the file.
 4. To use a different folder, click **Change…** and select a folder.
