@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://zahinarman.github.io/shutcap/</loc>
     <lastmod>2026-11-28</lastmod>
-    <video:video>
-      <video:thumbnail_loc>https://zahinarman.github.io/shutcap/media/shutcap-launch-poster.jpg</video:thumbnail_loc>
-      <video:title>ShutCap launch film</video:title>
-      <video:description>ShutCap in 47 seconds: pick the time your PC turns off, get two warnings and a countdown, cancel for a real emergency.</video:description>
-      <video:content_loc>https://zahinarman.github.io/shutcap/media/shutcap-launch.mp4</video:content_loc>
-      <video:duration>47</video:duration>
-      <video:family_friendly>yes</video:family_friendly>
-    </video:video>
   </url>
 </urlset>
